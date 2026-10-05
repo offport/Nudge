@@ -114,6 +114,10 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
 .yn button.on.no{background:rgba(229,72,77,.16);border-color:var(--crit);box-shadow:0 0 0 1px rgba(229,72,77,.3),0 0 12px rgba(229,72,77,.3)}
 .sos{margin:12px 0 0;padding:12px;border:1px solid rgba(229,72,77,.45);background:rgba(229,72,77,.06)}
 .sos .t{font-family:"Orbitron",monospace;font-size:12px;letter-spacing:.18em;color:#ff8a8e;margin-bottom:6px}
+.soslist{display:flex;flex-direction:column;gap:8px}
+.soslist button{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(229,72,77,.5);background:rgba(229,72,77,.08);font-size:16px;color:var(--ink);text-align:left}
+.soslist button:hover{border-color:var(--crit);box-shadow:0 0 0 1px rgba(229,72,77,.3),0 0 12px rgba(229,72,77,.3)}
+.soslist button small{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink3);letter-spacing:.06em}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 
 /* ---------- habits tab ---------- */
@@ -243,7 +247,7 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
     </div>
     <div class="sos" id="sosBox">
       <div class="t">🚨 ABOUT TO RELAPSE?</div>
-      <p class="note" style="margin:0 0 8px">One tap tells <b id="sosPartner">your partner</b> on Telegram right now, with the habit at stake and a note from you. Use it before, not after.</p>
+      <p class="note" style="margin:0 0 8px">One tap tells <b id="sosPartner">your partner</b> on Telegram right now, with the habit at stake. Nothing to type. Use it before, not after.</p>
       <button class="btn danger block big" id="sosBtn">I'M ABOUT TO RELAPSE &mdash; NUDGE MY PARTNER</button>
     </div>
     <div class="actions">
@@ -308,7 +312,7 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
     <div class="panel guide"><i class="br"></i>
       <div class="pb">
         <h3>WHAT NUDGE IS</h3>
-        <p>Two people keep each other honest. Each of you tracks habits to <b>build</b> (do it every day) and habits to <b>break</b> (stay clean every day), as daily yes/no streaks with a progress bar toward a target. Your partner gets your daily and weekly summaries on Telegram, and a nudge the moment you press <b>About to relapse</b>.</p>
+        <p>Two people keep each other honest. Each of you tracks habits to <b>build</b> (do it every day) and habits to <b>break</b> (stay clean every day), as daily yes/no streaks with a progress bar toward a target. Your partner gets your daily and weekly summaries on Telegram, and a nudge the moment you press <b>About to relapse</b>, one tap, nothing to type.</p>
         <p>There is no account and no server. Everything you type is encrypted in this browser with your passkey. The only thing that ever leaves the browser is a message you asked to send, straight to Telegram.</p>
 
         <h3>1 · SET UP THE APP</h3>
@@ -350,7 +354,7 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
         <ol>
           <li><b>Daily summary</b>: once you have marked every habit for the day (automatic if enabled, or the button on Today).</li>
           <li><b>Weekly summary</b>: days done per habit, streaks and bests for the week that ended (automatic on your first visit in a new week, or the button).</li>
-          <li><b>Relapse nudge</b>: the red button, immediately, with the habit at stake and your note. Agree with your partner what they do when it arrives: call, reply, meet.</li>
+          <li><b>Relapse nudge</b>: the red button, immediately, with the habit at stake and its streak. No typing: with one habit it sends on the spot, with several you tap the one at stake. Agree with your partner what they do when it arrives: call, reply, meet.</li>
         </ol>
 
         <h3>5 · TROUBLESHOOTING</h3>
@@ -418,12 +422,11 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
 
 <div class="scrim" id="sosModal" hidden>
   <div class="card panel"><i class="br"></i>
-    <h2>🚨 ABOUT TO RELAPSE</h2>
-    <div class="field"><label class="k" for="sosHabit">Which habit</label><select id="sosHabit"></select></div>
-    <div class="field"><label class="k" for="sosNote">A line for your partner (optional)</label><textarea id="sosNote" maxlength="400" placeholder="Where you are, what's going on, what would help."></textarea></div>
-    <p class="hint">This sends a Telegram message to <b id="sosTo">your partner</b> right now and is noted in your Sent log. The habit is not marked as slipped; you decide that on Today.</p>
+    <h2>🚨 WHICH ONE?</h2>
+    <p class="hint" style="margin:0 0 10px">One tap sends the nudge to <b id="sosTo">your partner</b> right now. Nothing to type.</p>
+    <div class="soslist" id="sosList"></div>
     <div class="formerr" id="sosErr"></div>
-    <div class="cardbtns"><button class="btn" id="sosCancel">Cancel</button><button class="btn danger" id="sosSend">Send the nudge now</button></div>
+    <div class="cardbtns"><button class="btn" id="sosCancel">Cancel</button></div>
   </div>
 </div>
 
@@ -814,22 +817,25 @@ $('sendWeeklyBtn').addEventListener('click', () => sendWeekly(0, false));
 
 /* ---------- relapse nudge ---------- */
 const sosM = $('sosModal');
+let sosBusy = false;
+async function sendSos(h){                   // no typing: the habit at stake, the streak, "reach out now"
+  if (sosBusy) return; sosBusy = true;
+  const text = [`🚨 ${me()} is about to relapse${h ? `: ${h.emoji || ''} ${h.name}` : ''}`, h ? `Streak at stake: 🔥 ${streak(h)} days (target ${h.target}).` : '', 'Reach out now 🙏'].filter(Boolean).join('\n');
+  $('sosBtn').disabled = true; $('sosBtn').textContent = 'SENDING…';
+  try { await sendToPartner('sos', text); sosM.hidden = true; toast(`Sent. ${S.partner.name || 'Your partner'} has it. Hold on. 💙`); }
+  catch (e) { $('sosErr').textContent = 'Could not send: ' + e.message; toast('Could not send: ' + e.message, true); }
+  finally { sosBusy = false; $('sosBtn').textContent = "I'M ABOUT TO RELAPSE — NUDGE MY PARTNER"; renderToday(); }
+}
 $('sosBtn').addEventListener('click', () => {
-  const sel = $('sosHabit'); const hs = S.habits.filter(h => h.type === 'break').concat(S.habits.filter(h => h.type === 'build'));
-  sel.innerHTML = hs.map(h => `<option value="${h.id}">${esc((h.emoji || '') + ' ' + h.name)} · 🔥 ${streak(h)} days</option>`).join('') + `<option value="">(something else)</option>`;
-  $('sosNote').value = ''; $('sosErr').textContent = ''; $('sosTo').textContent = S.partner.name || 'your partner'; sosM.hidden = false; $('sosNote').focus();
+  const hs = S.habits.filter(h => h.type === 'break').concat(S.habits.filter(h => h.type === 'build'));
+  if (hs.length <= 1) return sendSos(hs[0] || null);                     // one habit (or none): send straight away
+  $('sosList').innerHTML = hs.map(h => `<button type="button" data-id="${h.id}"><span>${esc(h.emoji || (h.type === 'break' ? '🧊' : '🌱'))}</span><span>${esc(h.name)}</span><small>🔥 ${streak(h)}d</small></button>`).join('')
+    + `<button type="button" data-id=""><span>🆘</span><span>Something else</span></button>`;
+  $('sosErr').textContent = ''; $('sosTo').textContent = S.partner.name || 'your partner'; sosM.hidden = false;
 });
+$('sosList').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) sendSos(S.habits.find(x => x.id === b.dataset.id) || null); });
 $('sosCancel').addEventListener('click', () => sosM.hidden = true);
 sosM.addEventListener('click', e => { if (e.target === sosM) sosM.hidden = true; });
-$('sosSend').addEventListener('click', async () => {
-  const h = S.habits.find(x => x.id === $('sosHabit').value), note = $('sosNote').value.trim();
-  const text = [`🚨 ${me()} is about to relapse${h ? `: ${h.emoji || ''} ${h.name}` : ''}`, h ? `Streak at stake: 🔥 ${streak(h)} days (target ${h.target}).` : '', note ? `"${note}"` : '', 'Reach out now 🙏'].filter(Boolean).join('\n');
-  $('sosSend').disabled = true;
-  try { await sendToPartner('sos', text); sosM.hidden = true; toast(`Sent. ${S.partner.name || 'Your partner'} has it. Hold on. 💙`); }
-  catch (e) { $('sosErr').textContent = 'Could not send: ' + e.message; }
-  finally { $('sosSend').disabled = false; }
-});
-
 /* ---------- partner tab ---------- */
 function renderPartner(){
   const hasBot = !!S.bot.token, linked = hasBot && !!S.partner.chatId;

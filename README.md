@@ -20,7 +20,7 @@ shows how).
 
 ![A habit's history: 12 weeks, tap a day to correct it](screenshots/04-habit-detail.png)
 
-![About to relapse: pick the habit, add a line, nudge your partner now](screenshots/05-relapse-nudge.png)
+![About to relapse: one tap on the habit at stake, nothing to type](screenshots/05-relapse-nudge.png)
 
 ![Partner tab: your bot token, find your partner, test, what gets sent](screenshots/06-partner.png)
 
@@ -52,7 +52,8 @@ in the test run is fake, and Telegram answered it with "Unauthorized", which is 
   to your partner's Telegram:
   - a **daily summary** once every habit is marked (automatic, or the button),
   - a **weekly summary** on your first visit in a new week (automatic, or the button),
-  - a **relapse nudge** the moment you press the red button, with the habit at stake and your note.
+  - a **relapse nudge** the moment you press the red button, with the habit at stake and its
+    streak. Nothing to type: one habit sends on the spot, several means one tap on the one at stake.
   Tokens are never shared and nothing passes through a third server. You keep talking in your
   normal Telegram chat; the bots only deliver notifications. Both directions work the same way
   with the partner's own bot.

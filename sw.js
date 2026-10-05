@@ -1,6 +1,6 @@
 /* Nudge service worker: the app shell works offline. Cache-first for the shell files,
    network for everything else (Telegram calls are never cached). Bump CACHE on release. */
-const CACHE = "nudge-v2";
+const CACHE = "nudge-v3";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

@@ -35,7 +35,7 @@
   --track:.14em; --dock:62px; --safe:env(safe-area-inset-bottom, 0px);
 }
 *{box-sizing:border-box}
-html{scrollbar-width:thin;scrollbar-color:var(--line2) transparent;-webkit-text-size-adjust:100%}
+html{color-scheme:dark;scrollbar-width:thin;scrollbar-color:var(--line2) transparent;-webkit-text-size-adjust:100%}   /* native date / time pickers in dark */
 body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
   font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:calc(var(--dock) + var(--safe))}
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
@@ -164,6 +164,11 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
 .chatlist button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:9px 10px;border:1px solid var(--line);background:var(--surface2);margin-top:6px}
 .chatlist button:hover{border-color:var(--accent)}
 .chatlist .cid{font-family:"IBM Plex Mono",monospace;color:var(--ink3);font-size:11px}
+.bubbles{display:flex;flex-direction:column;gap:10px}
+.bubble{max-width:92%;background:var(--surface2);border:1px solid var(--line2);border-left:2px solid var(--accent);padding:9px 12px;white-space:pre-wrap;font-size:13px;line-height:1.5;color:var(--ink);
+  clip-path:polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%)}
+.bubble .from{display:block;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.bubble.sos{border-left-color:var(--crit)} .bubble.sos .from{color:#ff8a8e}
 .log{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink3);line-height:1.5}
 .log div{padding:4px 0;border-bottom:1px solid var(--grid)} .log b{color:var(--ink2);font-weight:500}
 
@@ -296,11 +301,32 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
       </div>
     </div>
     <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">Daily check-in reminder · to you</span><span class="k" id="remState">off</span></div>
+      <div class="pb">
+        <p class="note">Every day at the time you pick, your bot sends <b>you</b> a check-in: which habits are marked, which are still open. Press <b>Start</b> on your own bot in Telegram, then <b>Find me</b>.</p>
+        <div class="row"><button class="btn" id="findMeBtn">🔎 Find me</button><button class="btn" id="remTestBtn">📨 Send it now</button></div>
+        <div class="chatlist" id="meList"></div>
+        <div class="row" style="margin-top:12px;gap:14px;flex-wrap:wrap">
+          <div class="field" style="margin:0"><label class="k" for="remTime">Time</label><input type="time" id="remTime" value="19:00" style="width:130px"></div>
+          <label class="toggle" style="border:0;padding:0;gap:8px"><input type="checkbox" id="remOn"><span class="tl">Reminder on</span></label>
+        </div>
+        <p class="msg" id="remMsg"></p>
+        <p class="note">The app sends it when it is open at that time (or the next time you open it that day). Nothing can run while the page is closed, so for a guaranteed 7 pm even with the app closed, use the cron option below.</p>
+        <h2 class="sec">Guaranteed, even when the app is closed</h2>
+        <p class="note">A free cron service (for example <a href="https://cron-job.org" target="_blank" rel="noopener">cron-job.org</a>) can call this address every day at your time; Telegram then delivers a fixed check-in listing your habits. The address contains your bot token and your chat id, so only paste it into a service you trust, and regenerate it when your habits change.</p>
+        <div class="code"><span id="cronUrl" style="filter:blur(0)">—</span><button class="mini" id="cronCopy">Copy</button></div>
+        <p class="note" id="cronNote"></p>
+      </div>
+    </div>
+    <div class="panel"><i class="br"></i>
       <div class="ph"><span class="k">What gets sent</span></div>
       <div class="pb">
         <div class="toggle"><div><div class="tl">📅 Daily summary, automatically</div><div class="th">Sent once a day, the moment you have marked every habit for today.</div></div><input type="checkbox" id="autoDaily"></div>
         <div class="toggle"><div><div class="tl">📊 Weekly summary, automatically</div><div class="th">Sent the first time you open the app in a new week, covering the week that ended.</div></div><input type="checkbox" id="autoWeekly"></div>
         <div class="toggle"><div><div class="tl">🚨 Relapse nudges</div><div class="th">The red button on Today. Always sent immediately when you press it.</div></div><input type="checkbox" id="allowSos" checked></div>
+        <h2 class="sec">What your partner gets · preview</h2>
+        <p class="note" style="margin-top:0">The exact texts your bot will deliver, built from your habits as they stand right now.</p>
+        <div class="bubbles" id="previewBubbles"></div>
         <h2 class="sec">Sent log</h2>
         <div class="log" id="sentLog"><div>nothing sent yet</div></div>
       </div>
@@ -357,7 +383,11 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
           <li><b>Relapse nudge</b>: the red button, immediately, with the habit at stake and its streak. No typing: with one habit it sends on the spot, with several you tap the one at stake. Agree with your partner what they do when it arrives: call, reply, meet.</li>
         </ol>
 
-        <h3>5 · TROUBLESHOOTING</h3>
+        <h3>5 · A CHECK-IN REMINDER TO YOURSELF, DAILY AT 7 PM</h3>
+        <p>On the <b>Partner</b> tab, under <b>Daily check-in reminder</b>: press Start on your own bot in Telegram, press <b>Find me</b> and pick yourself, choose the time (7 pm by default) and switch it on. At that time your bot messages <i>you</i> with today's check-in: what is marked, what is still open, and a link to mark the rest.</p>
+        <p><b>The catch:</b> a web page cannot do anything while it is closed. The reminder goes out when the app is open at that time (a desktop tab, or the Home Screen app in the foreground), or the moment you open it later that day. For a guaranteed 7 pm with the app closed, use the <b>cron</b> address the app generates: paste it into a free scheduler such as cron-job.org, set it to daily at your time, and Telegram delivers a fixed check-in listing your habits. That address contains your bot token, so choose a service you trust, and regenerate it after you change your habits.</p>
+
+        <h3>6 · TROUBLESHOOTING</h3>
         <ol>
           <li><b>"Unauthorized" when saving the token</b>: the token was copied wrong or revoked. Ask BotFather for <span class="mono">/token</span> again.</li>
           <li><b>Find my partner finds nobody</b>: your partner must message the bot first (press Start). Telegram only keeps those messages for 24 hours, so press Find soon after.</li>
@@ -366,7 +396,7 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
           <li><b>Lost passkey</b>: there is no recovery. Clear the browser's site data (or ⚙ &rarr; Reset) and set up again from a backup you can open, or from scratch.</li>
         </ol>
 
-        <h3>6 · PRIVACY MODEL</h3>
+        <h3>7 · PRIVACY MODEL</h3>
         <p>The page is static (it is served from GitHub Pages and contains nothing of yours). Your vault is one encrypted blob in this browser's storage; the key comes from your passkey and is never stored (unless you choose Stay unlocked, which keeps a non-extractable copy of the derived key in this browser only). Telegram sees exactly the messages you send and nothing else. The Sent log is in the vault too.</p>
       </div>
     </div>
@@ -466,7 +496,8 @@ function setMsg(id, text, cls){ const m = $(id); m.textContent = text || ''; m.c
    state (what the vault holds)
    ========================================================================= */
 const BLANK = () => ({ v:1, me:{ name:'' }, partner:{ name:'', chatId:'', chatName:'' }, bot:{ token:'', username:'' },
-  habits:[], settings:{ autoDaily:true, autoWeekly:true, allowSos:true, weekStart:1, lastDaily:'', lastWeekly:'' }, log:[] });
+  habits:[], settings:{ autoDaily:true, autoWeekly:true, allowSos:true, weekStart:1, lastDaily:'', lastWeekly:'' },
+  reminder:{ enabled:false, time:'19:00', chatId:'', chatName:'', lastSent:'' }, log:[] });
 let S = BLANK();
 let currentTab = 'today', detailId = null;
 
@@ -530,7 +561,7 @@ if (firstRun) { $('lockTitle').textContent = 'SET A PASSKEY'; $('pk2wrap').hidde
 function adopt(data){
   const b = BLANK();
   S = { ...b, ...data, me:{ ...b.me, ...(data.me||{}) }, partner:{ ...b.partner, ...(data.partner||{}) }, bot:{ ...b.bot, ...(data.bot||{}) },
-        settings:{ ...b.settings, ...(data.settings||{}) }, habits: Array.isArray(data.habits) ? data.habits : [], log: Array.isArray(data.log) ? data.log : [] };
+        settings:{ ...b.settings, ...(data.settings||{}) }, reminder:{ ...b.reminder, ...(data.reminder||{}) }, habits: Array.isArray(data.habits) ? data.habits : [], log: Array.isArray(data.log) ? data.log : [] };
   for (const h of S.habits) { h.days ||= {}; h.target = Math.max(1, +h.target || 30); h.type = h.type === 'break' ? 'break' : 'build'; h.start ||= todayKey(); }
 }
 function enter(data){
@@ -539,7 +570,7 @@ function enter(data){
   lockEl.hidden = true; $('app').hidden = false;
   renderAll();
   if (firstRun) showTab(S.habits.length ? 'today' : 'guide');
-  autoWeekly();
+  autoWeekly(); reminderTick();
 }
 async function unlock(){
   lockErr.textContent = '';
@@ -847,7 +878,14 @@ function renderPartner(){
   $('autoDaily').checked = !!S.settings.autoDaily; $('autoWeekly').checked = !!S.settings.autoWeekly; $('allowSos').checked = !!S.settings.allowSos;
   const chip = $('chipPartner'); chip.className = 'chip' + (linked ? ' on' : hasBot ? ' warn' : '');
   $('chipPartnerTxt').textContent = linked ? `↔ ${S.partner.name || S.partner.chatName || 'partner'}` : hasBot ? 'BOT OK · NO PARTNER' : 'NO PARTNER';
-  renderLog();
+  renderLog(); renderPreview(); renderReminder();
+}
+function renderPreview(){
+  const bot = S.bot.username ? '@' + S.bot.username : 'your bot';
+  const sosH = S.habits.find(h => h.type === 'break') || S.habits[0] || null;
+  const sos = [`🚨 ${me()} is about to relapse${sosH ? `: ${sosH.emoji || ''} ${sosH.name}` : ''}`, sosH ? `Streak at stake: 🔥 ${streak(sosH)} days (target ${sosH.target}).` : '', 'Reach out now 🙏'].filter(Boolean).join('\n');
+  const items = S.habits.length ? [['daily', dailyText()], ['weekly', weeklyText(0)], ['sos', sos]] : [['daily', `📅 ${me()}'s check-in · (add habits to see it)`]];
+  $('previewBubbles').innerHTML = items.map(([k, t]) => `<div class="bubble${k === 'sos' ? ' sos' : ''}"><span class="from">${esc(bot)} · ${k === 'sos' ? 'relapse nudge' : k + ' summary'}</span>${esc(t)}</div>`).join('');
 }
 function renderLog(){
   $('sentLog').innerHTML = S.log.length ? S.log.map(l => `<div>${l.ok ? '✅' : '❌'} <b>${new Date(l.t).toLocaleString()}</b> · ${l.kind} ${l.ok ? '' : '· ' + esc(l.err)}<br>${esc(l.text.split('\n')[0])}</div>`).join('') : '<div>nothing sent yet</div>';
@@ -883,6 +921,68 @@ $('testBtn').addEventListener('click', async () => {
 $('namesSaveBtn').addEventListener('click', async () => { S.partner.name = $('partnerName').value.trim(); S.me.name = $('myName').value.trim(); await save(); renderPartner(); renderToday(); setMsg('partnerMsg', 'Saved.', 'ok'); });
 ['autoDaily','autoWeekly','allowSos'].forEach(id => $(id).addEventListener('change', async () => { S.settings[id] = $(id).checked; await save(); renderToday(); }));
 
+/* ---------- daily check-in reminder to the user's own chat ---------- */
+const APP_URL = location.href.split(/[?#]/)[0];
+function reminderText(){
+  const t = todayKey(); const lines = [`📅 Check-in time, ${S.me.name || 'you'}! ${fmtDate(t, { weekday:'short', day:'numeric', month:'short' })}`];
+  let open = 0;
+  for (const h of S.habits) { const v = val(h, t), brk = h.type === 'break', st = streak(h);
+    if (v === 1) lines.push(`✅ ${h.emoji || ''} ${h.name} — ${brk ? 'clean' : 'done'} · 🔥 ${st}/${h.target}`);
+    else if (v === 0) lines.push(`${brk ? '💥' : '❌'} ${h.emoji || ''} ${h.name} — ${brk ? 'slipped' : 'missed'}`);
+    else { open++; lines.push(`⬜ ${h.emoji || ''} ${h.name} — not marked yet (🔥 ${st}${brk ? ' clean' : ''})`); } }
+  lines.push(open ? `${open} still open. Mark today: ${APP_URL}` : `All marked. Nice. ✨`);
+  return lines.join('\n');
+}
+function cronText(){
+  const list = S.habits.map(h => `${h.emoji || ''} ${h.name}`.trim()).join(' · ');
+  return `📅 ${S.reminder.time} check-in, ${S.me.name || 'you'}! Mark today in Nudge: ${list || '(your habits)'} → ${APP_URL}`;
+}
+function cronUrl(){
+  if (!S.bot.token || !S.reminder.chatId) return '';
+  return `https://api.telegram.org/bot${S.bot.token}/sendMessage?chat_id=${encodeURIComponent(S.reminder.chatId)}&text=${encodeURIComponent(cronText())}`;
+}
+function renderReminder(){
+  const r = S.reminder, ready = !!(S.bot.token && r.chatId);
+  $('remState').textContent = ready ? (r.enabled ? `on · ${r.time}` : 'off') : 'link yourself first';
+  $('findMeBtn').disabled = !S.bot.token; $('remTestBtn').disabled = !ready; $('remOn').disabled = !ready; $('remOn').checked = !!r.enabled; $('remTime').value = r.time || '19:00';
+  const u = cronUrl();
+  $('cronUrl').textContent = u ? u.replace(/bot\d+:[^/]+/, 'bot•••••••••••••••') : 'link yourself first';
+  $('cronCopy').disabled = !u;
+  $('cronNote').textContent = u ? `Copy keeps the real token; the display hides it. Schedule it daily at ${r.time} in your cron service.` : '';
+}
+async function sendReminder(auto){
+  if (!S.bot.token || !S.reminder.chatId) return;
+  try { await tg('sendMessage', { chat_id:S.reminder.chatId, text:reminderText() }); logSent('reminder', reminderText(), true); S.reminder.lastSent = todayKey(); await save(); renderLog(); if (!auto) setMsg('remMsg', 'Sent to your Telegram.', 'ok'); else toast('Check-in reminder sent to you 📅'); }
+  catch (e) { logSent('reminder', reminderText(), false, e.message); await save(); renderLog(); if (!auto) setMsg('remMsg', 'Telegram says: ' + e.message, 'err'); }
+}
+function reminderTick(){
+  const r = S.reminder; if (!vaultKey || !r.enabled || !r.chatId || !S.bot.token) return;
+  const t = todayKey(); if (r.lastSent === t) return;
+  const now = new Date(), [hh, mm] = (r.time || '19:00').split(':').map(Number);
+  if (now.getHours() > hh || (now.getHours() === hh && now.getMinutes() >= mm)) sendReminder(true);
+}
+setInterval(reminderTick, 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) reminderTick(); });
+$('findMeBtn').addEventListener('click', async () => {
+  setMsg('remMsg', 'Asking your bot who has messaged it…'); $('meList').innerHTML = '';
+  try {
+    const ups = await tg('getUpdates', { limit:100, timeout:0, allowed_updates:'["message"]' });
+    const chats = new Map();
+    for (const u of ups) { const c = u.message && u.message.chat; if (c && c.type === 'private') chats.set(String(c.id), `${c.first_name || ''} ${c.last_name || ''}`.trim() + (c.username ? ` @${c.username}` : '')); }
+    if (!chats.size) return setMsg('remMsg', 'Nobody yet. Open your bot in Telegram, press Start, then try again.', 'err');
+    $('meList').innerHTML = [...chats].map(([id, name]) => `<button type="button" data-mid="${id}" data-mn="${esc(name)}"><span>${esc(name || 'unnamed')}</span><span class="cid">${id}</span></button>`).join('');
+    setMsg('remMsg', 'Pick yourself.', 'ok');
+  } catch (e) { setMsg('remMsg', 'Telegram says: ' + e.message, 'err'); }
+});
+$('meList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-mid]'); if (!b) return;
+  S.reminder.chatId = b.dataset.mid; S.reminder.chatName = b.dataset.mn; await save(); $('meList').innerHTML = ''; renderReminder(); setMsg('remMsg', `That's you: ${S.reminder.chatName}. Switch the reminder on.`, 'ok');
+});
+$('remTestBtn').addEventListener('click', () => sendReminder(false));
+$('remOn').addEventListener('change', async () => { S.reminder.enabled = $('remOn').checked; await save(); renderReminder(); if (S.reminder.enabled) reminderTick(); });
+$('remTime').addEventListener('change', async () => { const v = $('remTime').value; if (/^\d\d:\d\d$/.test(v)) { S.reminder.time = v; S.reminder.lastSent = ''; await save(); renderReminder(); } });
+$('cronCopy').addEventListener('click', async () => { const u = cronUrl(); if (!u) return; try { await navigator.clipboard.writeText(u); toast('Cron address copied (contains your token: paste it only into your cron service)'); } catch (e) { toast('Could not copy', true); } });
+
 /* ---------- settings ---------- */
 function renderSettings(){ [...$('weekStart').children].forEach(b => b.classList.toggle('on', +b.dataset.ws === S.settings.weekStart)); }
 $('weekStart').addEventListener('click', async e => { const b = e.target.closest('[data-ws]'); if (b) { S.settings.weekStart = +b.dataset.ws; await save(); renderSettings(); if (detailId) renderDetail(); } });
@@ -890,6 +990,7 @@ $('weekStart').addEventListener('click', async e => { const b = e.target.closest
 /* ---------- tabs ---------- */
 function showTab(t){
   currentTab = t;
+  if (t === 'partner') renderPartner();                      // the preview reflects today's marks
   document.querySelectorAll('section[data-tab]').forEach(s => s.hidden = s.dataset.tab !== t);
   document.querySelectorAll('.dk').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   window.scrollTo(0, 0);

@@ -14,26 +14,21 @@ shows how).
 
 ## Screenshots
 
-![First visit: set a passkey; the vault is created in this browser](screenshots/01-first-visit.png)
+<table>
+<tr><td width="50%" valign="top"><img src="screenshots/01-first-visit.png" width="100%" alt="First visit: set a passkey and your first name; the vault is created in this browser."><br><sub>First visit: set a passkey and your first name; the vault is created in this browser.</sub></td><td width="50%" valign="top"><img src="screenshots/02-today.png" width="100%" alt="Today: one tap per habit (did it / not today, clean / slipped), streak and best, progress bar to the target, and the red relapse button."><br><sub>Today: one tap per habit (did it / not today, clean / slipped), streak and best, progress bar to the target, and the red relapse button.</sub></td></tr>
+<tr><td width="50%" valign="top"><img src="screenshots/03-relapse.png" width="100%" alt="About to relapse: with several habits, one tap on the one at stake sends the nudge. Nothing to type."><br><sub>About to relapse: with several habits, one tap on the one at stake sends the nudge. Nothing to type.</sub></td><td width="50%" valign="top"><img src="screenshots/04-habits.png" width="100%" alt="Habits: Build or Break, emoji, target in days, since when; open one to see its history."><br><sub>Habits: Build or Break, emoji, target in days, since when; open one to see its history.</sub></td></tr>
+<tr><td width="50%" valign="top"><img src="screenshots/05-habit-history.png" width="100%" alt="A habit's history: streak, best, days clean, success rate, and 12 weeks you can tap to correct."><br><sub>A habit's history: streak, best, days clean, success rate, and 12 weeks you can tap to correct.</sub></td><td width="50%" valign="top"><img src="screenshots/06-partner.png" width="100%" alt="Partner: your own bot (checked against Telegram), find your partner among the chats that started it, test it."><br><sub>Partner: your own bot (checked against Telegram), find your partner among the chats that started it, test it.</sub></td></tr>
+<tr><td width="50%" valign="top"><img src="screenshots/07-messages.png" width="100%" alt="What your partner receives: the exact daily summary, weekly summary and relapse nudge, plus the sent log."><br><sub>What your partner receives: the exact daily summary, weekly summary and relapse nudge, plus the sent log.</sub></td><td width="50%" valign="top"><img src="screenshots/08-guide.png" width="100%" alt="The Guide: set-up, Home Screen on iPhone / Android / desktop, creating the bots, troubleshooting, privacy."><br><sub>The Guide: set-up, Home Screen on iPhone / Android / desktop, creating the bots, troubleshooting, privacy.</sub></td></tr>
+<tr><td width="50%" valign="top"><img src="screenshots/09-settings.png" width="100%" alt="More: week start, backup and restore of the encrypted vault, change passkey, lock, delete everything."><br><sub>More: week start, backup and restore of the encrypted vault, change passkey, lock, delete everything.</sub></td><td width="50%" valign="top"><img src="screenshots/10-locked.png" width="100%" alt="Locked: a wrong passkey simply fails to decrypt; there is no recovery and no server to ask."><br><sub>Locked: a wrong passkey simply fails to decrypt; there is no recovery and no server to ask.</sub></td></tr>
+<tr><td width="50%" valign="top"><img src="screenshots/12-reminder.png" width="100%" alt="Daily check-in reminder to yourself: find yourself, pick a time, switch it on; cron address for guaranteed delivery"><br><sub>Daily check-in reminder to yourself: pick a time (7 pm by default), switch it on; the cron address gives a guaranteed delivery even with the app closed, token hidden on screen.</sub></td><td width="50%" valign="top"></td></tr>
+</table>
 
-![Today: mark each habit, streaks and progress bars, the relapse button](screenshots/03-today.png)
+<img src="screenshots/11-desktop.png" width="100%" alt="On a desktop the same page centres itself with the tabs on top">
+<br><sub>On a desktop the same page centres itself, with the tabs along the top.</sub>
 
-![A habit's history: 12 weeks, tap a day to correct it](screenshots/04-habit-detail.png)
-
-![About to relapse: one tap on the habit at stake, nothing to type](screenshots/05-relapse-nudge.png)
-
-![Partner tab: your bot token, find your partner, test, what gets sent](screenshots/06-partner.png)
-
-![The Guide: set-up, Home Screen, Telegram bots, troubleshooting](screenshots/02-guide.png)
-
-![Settings: week start, backup and restore, passkey, lock, reset](screenshots/07-settings.png)
-
-![Locked: a wrong passkey simply fails to decrypt](screenshots/08-locked.png)
-
-![On a desktop the same page centres itself with the tabs on top](screenshots/09-desktop.png)
-
-Captured in headless Chromium with a throwaway vault and made-up habits; the Telegram token shown
-in the test run is fake, and Telegram answered it with "Unauthorized", which is what the app shows.
+Taken in a headless browser with throwaway data: the names (Sam, Alex) and habits are made up, the
+token field is never shown filled, and no chat ids appear. The bot and the three example messages
+were real, delivered to a test chat.
 
 ## How it works
 
@@ -54,6 +49,11 @@ in the test run is fake, and Telegram answered it with "Unauthorized", which is 
   - a **weekly summary** on your first visit in a new week (automatic, or the button),
   - a **relapse nudge** the moment you press the red button, with the habit at stake and its
     streak. Nothing to type: one habit sends on the spot, several means one tap on the one at stake.
+- **Daily check-in reminder, to you.** Press Start on your own bot, **Find me**, pick a time (7 pm by
+  default) and switch it on: your bot messages you what is marked and what is still open, with a link.
+  A page can't run while closed, so this goes out when the app is open at that time or when you next
+  open it that day. For a guaranteed time with the app closed, the app generates a cron address (bot
+  token plus your chat id) to paste into a free scheduler such as cron-job.org.
   Tokens are never shared and nothing passes through a third server. You keep talking in your
   normal Telegram chat; the bots only deliver notifications. Both directions work the same way
   with the partner's own bot.

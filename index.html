@@ -47,11 +47,11 @@ a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--line2)}
 .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .k{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:9.5px;letter-spacing:var(--track);text-transform:uppercase;color:var(--ink3);font-weight:500}
 [hidden]{display:none !important}
-.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:10px 12px 20px;display:flex;flex-direction:column;gap:12px}
+.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:calc(10px + env(safe-area-inset-top, 0px)) 12px 20px;display:flex;flex-direction:column;gap:12px}
 
 /* ---------- top bar ---------- */
 .top{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
-  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));position:sticky;top:0;z-index:20}
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));position:sticky;top:env(safe-area-inset-top, 0px);z-index:20}
 .wordmark{font-family:"Orbitron","IBM Plex Mono",monospace;font-weight:700;font-size:15px;letter-spacing:.2em;color:var(--accent);text-shadow:0 0 18px rgba(53,214,245,.35);white-space:nowrap}
 .wordmark small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:9px;letter-spacing:.14em;color:var(--ink3);margin-left:8px}
 .chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
@@ -182,7 +182,7 @@ p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
 @media(min-width:900px){ .dock{position:sticky;bottom:auto;top:62px;height:auto;max-width:760px;margin:0 auto;border:1px solid var(--line2);padding:0;grid-template-columns:repeat(5,1fr)} .dk{padding:9px 0;flex-direction:row;gap:8px;font-size:10px} body{padding-bottom:20px} .wrap{gap:12px} }
 
 /* ---------- lock + modals ---------- */
-.scrim{position:fixed;inset:0;z-index:60;background:rgba(4,9,14,.92);display:grid;place-items:start center;overflow:auto;padding:28px 14px}
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(4,9,14,.92);display:grid;place-items:start center;overflow:auto;padding:calc(28px + env(safe-area-inset-top, 0px)) 14px 28px}
 .card{width:min(460px,100%);background:var(--surface);border:1px solid var(--line2);box-shadow:0 20px 60px rgba(0,0,0,.6);padding:18px 18px 16px;
   clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))}
 .card h2{font-family:"Orbitron",monospace;font-size:13px;letter-spacing:.22em;color:var(--accent);margin:0 0 12px;display:flex;align-items:center;gap:10px}

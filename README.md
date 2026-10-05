@@ -26,9 +26,8 @@ shows how).
 <img src="screenshots/11-desktop.png" width="100%" alt="On a desktop the same page centres itself with the tabs on top">
 <br><sub>On a desktop the same page centres itself, with the tabs along the top.</sub>
 
-Taken in a headless browser with throwaway data: the names (Sam, Alex) and habits are made up, the
-token field is never shown filled, and no chat ids appear. The bot and the three example messages
-were real, delivered to a test chat.
+Taken in a headless browser with throwaway data: the names (Sam, Alex), the habits and the bot
+(@sams_nudge_bot) are made up, the token field is never shown filled, and no chat ids appear.
 
 ## How it works
 

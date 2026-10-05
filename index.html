@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NUDGE</title>
+<meta name="description" content="Two-person accountability: build habits, break habits, daily streaks, and a Telegram nudge to your partner when you are about to slip. Encrypted in your browser; no server.">
+<meta name="theme-color" content="#05090F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nudge">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Orbitron:wght@500;600;700&display=swap">
+<style>
+/* ============================================================
+   NUDGE — two-person accountability in the Batcomputer HUD theme.
+   One static page. Everything the user saves is AES-256-GCM encrypted in
+   this browser under a passkey; the only network calls are to Telegram's
+   Bot API, straight from the browser, when the user asks for a message.
+   ============================================================ */
+:root{
+  --bg:#05090F; --surface:#0A1119; --surface2:#101A24; --surface3:#16232F;
+  --ink:#DCEEF7; --ink2:#8FB3C6; --ink3:#638697;
+  --line:#16303F; --line2:#1F4657; --grid:#0F2130;
+  --accent:#35D6F5; --accent-soft:#0A2430;
+  --good:#1EA87B; --warn:#C27E24; --crit:#E5484D;
+  --glow:0 0 0 1px rgba(53,214,245,.35), 0 0 16px rgba(53,214,245,.20);
+  --shadow:0 0 0 1px rgba(53,214,245,.06), 0 2px 18px rgba(0,0,0,.6);
+  --bracket:rgba(53,214,245,.42);
+  --track:.14em; --dock:62px; --safe:env(safe-area-inset-bottom, 0px);
+}
+*{box-sizing:border-box}
+html{scrollbar-width:thin;scrollbar-color:var(--line2) transparent;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh;font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:calc(var(--dock) + var(--safe))}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 55% 45% at 50% 30%, rgba(53,214,245,.06), transparent 70%),
+             repeating-linear-gradient(0deg, rgba(53,214,245,.028) 0 1px, transparent 1px 3px)}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;-webkit-tap-highlight-color:transparent}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--line2)}
+:focus-visible{outline:none;box-shadow:var(--glow);border-radius:4px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.k{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:9.5px;letter-spacing:var(--track);text-transform:uppercase;color:var(--ink3);font-weight:500}
+[hidden]{display:none !important}
+.wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:10px 12px 20px;display:flex;flex-direction:column;gap:12px}
+
+/* ---------- top bar ---------- */
+.top{display:flex;align-items:center;gap:12px;padding:9px 14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
+  clip-path:polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));position:sticky;top:0;z-index:20}
+.wordmark{font-family:"Orbitron","IBM Plex Mono",monospace;font-weight:700;font-size:15px;letter-spacing:.2em;color:var(--accent);text-shadow:0 0 18px rgba(53,214,245,.35);white-space:nowrap}
+.wordmark small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:9px;letter-spacing:.14em;color:var(--ink3);margin-left:8px}
+.chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.chip{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--line2);
+  color:var(--ink2);background:var(--surface2);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.chip .dot{width:6px;height:6px;border-radius:50%;background:var(--ink3)}
+.chip.on .dot{background:var(--good);box-shadow:0 0 8px var(--good)} .chip.warn .dot{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.mini{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--line2);color:var(--ink3);padding:4px 9px;white-space:nowrap;background:var(--surface2)}
+.mini:hover{color:var(--accent);border-color:var(--accent)}
+.mini.acc{color:var(--accent);border-color:rgba(53,214,245,.5)}
+.btn{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:10px 14px;border:1px solid var(--line2);color:var(--ink);background:var(--surface2);transition:.15s}
+.btn:hover{border-color:var(--accent)} .btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);box-shadow:var(--glow)}
+.btn.danger{border-color:rgba(229,72,77,.5);color:#ff8a8e}
+.btn.good{border-color:rgba(30,168,123,.5);color:var(--good)}
+.btn.block{width:100%;display:block}
+.btn.big{font-size:12.5px;padding:14px 16px}
+
+/* ---------- panels ---------- */
+.panel{position:relative;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.panel::before,.panel::after,.panel .br::before,.panel .br::after{content:"";position:absolute;width:14px;height:14px;pointer-events:none;z-index:3}
+.panel::before{left:-1px;top:-1px;border-left:2px solid var(--bracket);border-top:2px solid var(--bracket)}
+.panel::after{right:-1px;bottom:-1px;border-right:2px solid var(--bracket);border-bottom:2px solid var(--bracket)}
+.panel .br::before{right:-1px;top:-1px;border-right:2px solid var(--bracket);border-top:2px solid var(--bracket)}
+.panel .br::after{left:-1px;bottom:-1px;border-left:2px solid var(--bracket);border-bottom:2px solid var(--bracket)}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line)}
+.ph .k{color:var(--accent);font-size:10px}
+.pb{padding:12px}
+.empty{padding:22px 14px;text-align:center;color:var(--ink3);font-size:13px}
+.empty b{display:block;font-family:"Orbitron",monospace;font-size:14px;letter-spacing:.22em;color:var(--accent);margin-bottom:6px}
+h2.sec{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:14px 0 6px}
+p.note{font-size:12px;color:var(--ink3);line-height:1.5;margin:6px 0}
+.row{display:flex;align-items:center;gap:10px}
+.grow{flex:1;min-width:0}
+.ok{color:var(--good)} .bad{color:#ff8a8e} .warn{color:var(--warn)}
+.msg{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.04em;min-height:1.2em;margin:8px 0 0;color:var(--ink2)}
+.msg.ok{color:var(--good)} .msg.err{color:#ff8a8e}
+
+/* ---------- today: habit cards ---------- */
+.today-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:14px 12px 6px}
+.today-head .date{font-family:"Orbitron",monospace;font-size:16px;letter-spacing:.16em;color:var(--ink)}
+.today-head .sub{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;color:var(--ink3);text-transform:uppercase}
+.hab{display:grid;grid-template-columns:44px 1fr auto;gap:8px 12px;align-items:center;padding:12px;border-bottom:1px solid var(--line)}
+.hab:last-child{border-bottom:0}
+.hab .emo{font-size:26px;width:44px;height:44px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--line2)}
+.hab .nm{font-weight:600;font-size:15px;color:var(--ink)}
+.hab .typ{font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-left:8px}
+.hab .typ.build{color:var(--accent)} .hab .typ.break{color:var(--warn)}
+.hab .st{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink2);margin-top:2px}
+.hab .st b{color:var(--ink);font-weight:600}
+.bar{grid-column:1/-1;height:8px;background:var(--surface2);border:1px solid var(--line2);position:relative;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--accent),#8fe9fb);box-shadow:0 0 10px rgba(53,214,245,.5);transition:width .35s ease}
+.bar.break i{background:linear-gradient(90deg,var(--warn),#f2b96a);box-shadow:0 0 10px rgba(194,126,36,.5)}
+.bar.done i{background:linear-gradient(90deg,var(--good),#5fd9b0);box-shadow:0 0 10px rgba(30,168,123,.55)}
+.barlbl{grid-column:1/-1;display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.08em;color:var(--ink3);margin-top:-4px}
+.yn{display:flex;gap:6px}
+.yn button{width:46px;height:40px;border:1px solid var(--line2);background:var(--surface2);font-size:18px;transition:.15s}
+.yn button:hover{border-color:var(--accent)}
+.yn button.on.yes{background:rgba(30,168,123,.18);border-color:var(--good);box-shadow:0 0 0 1px rgba(30,168,123,.3),0 0 12px rgba(30,168,123,.35)}
+.yn button.on.no{background:rgba(229,72,77,.16);border-color:var(--crit);box-shadow:0 0 0 1px rgba(229,72,77,.3),0 0 12px rgba(229,72,77,.3)}
+.sos{margin:12px 0 0;padding:12px;border:1px solid rgba(229,72,77,.45);background:rgba(229,72,77,.06)}
+.sos .t{font-family:"Orbitron",monospace;font-size:12px;letter-spacing:.18em;color:#ff8a8e;margin-bottom:6px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+/* ---------- habits tab ---------- */
+.hl{display:grid;grid-template-columns:44px 1fr auto;gap:6px 12px;align-items:center;padding:12px;border-bottom:1px solid var(--line);cursor:pointer}
+.hl:hover{background:var(--surface2)} .hl:last-child{border-bottom:0}
+.hl .emo{font-size:24px;width:44px;height:44px;display:grid;place-items:center;background:var(--surface2);border:1px solid var(--line2)}
+.hl .meta{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--ink3);letter-spacing:.04em}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+.cal .d{aspect-ratio:1;border:1px solid var(--line);background:var(--surface2);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--ink3);cursor:pointer;position:relative}
+.cal .d.yes{background:rgba(30,168,123,.28);border-color:rgba(30,168,123,.6);color:var(--ink)}
+.cal .d.no{background:rgba(229,72,77,.25);border-color:rgba(229,72,77,.6);color:var(--ink)}
+.cal .d.clean{background:rgba(194,126,36,.16);border-color:rgba(194,126,36,.4)}
+.cal .d.future{opacity:.25;cursor:default}
+.cal .d.today{box-shadow:var(--glow)}
+.cal .d.pre{opacity:.3;cursor:default}
+.calhead{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:10px}
+.calhead span{text-align:center}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.stat{border:1px solid var(--line);background:var(--surface2);padding:8px;text-align:center}
+.stat b{display:block;font-family:"Orbitron",monospace;font-size:16px;color:var(--accent)}
+.stat span{font-family:"IBM Plex Mono",monospace;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+
+/* ---------- forms ---------- */
+.field{margin-bottom:12px}
+.field label{display:block;margin-bottom:5px}
+.field input[type=text],.field input[type=password],.field input[type=number],.field input[type=date],.field select,.field textarea{
+  width:100%;background:#060E15;border:1px solid var(--line2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:13px;padding:9px 11px;border-radius:0}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:var(--glow)}
+.field textarea{min-height:70px;resize:vertical;font-family:"IBM Plex Sans",sans-serif}
+.field .hint{font-size:11px;color:var(--ink3);margin-top:4px}
+.seg{display:inline-flex;border:1px solid var(--line2);background:var(--surface2)}
+.seg button{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:8px 12px;border-right:1px solid var(--line2);color:var(--ink2)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent-soft);color:var(--accent);box-shadow:inset 0 0 0 1px rgba(53,214,245,.35)}
+.emos{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.emos button{width:34px;height:34px;font-size:18px;border:1px solid var(--line);background:var(--surface2)}
+.emos button.on{border-color:var(--accent);box-shadow:var(--glow)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.toggle:last-child{border-bottom:0}
+.toggle input{accent-color:var(--accent);width:18px;height:18px}
+.toggle .tl{font-size:13px;color:var(--ink)} .toggle .th{font-size:11px;color:var(--ink3)}
+.code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:#060E15;border:1px solid var(--line2);padding:8px 10px;color:var(--accent);display:flex;justify-content:space-between;gap:8px;align-items:center;margin:6px 0}
+.code span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chatlist button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:9px 10px;border:1px solid var(--line);background:var(--surface2);margin-top:6px}
+.chatlist button:hover{border-color:var(--accent)}
+.chatlist .cid{font-family:"IBM Plex Mono",monospace;color:var(--ink3);font-size:11px}
+.log{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink3);line-height:1.5}
+.log div{padding:4px 0;border-bottom:1px solid var(--grid)} .log b{color:var(--ink2);font-weight:500}
+
+/* ---------- guide ---------- */
+.guide h3{font-family:"Orbitron",monospace;font-size:12px;letter-spacing:.18em;color:var(--accent);margin:18px 0 6px}
+.guide h3:first-child{margin-top:0}
+.guide ol{padding-left:20px;margin:6px 0} .guide li{margin:5px 0;color:var(--ink2)} .guide li b{color:var(--ink)}
+.guide p{color:var(--ink2);margin:6px 0}
+.guide .box{border:1px solid var(--line);background:var(--surface2);padding:10px 12px;margin:8px 0}
+.guide .box .k{color:var(--accent);display:block;margin-bottom:4px}
+.flow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink2);background:#060E15;border:1px solid var(--line2);padding:10px 12px;white-space:pre;overflow-x:auto;line-height:1.6}
+
+/* ---------- dock ---------- */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:30;height:calc(var(--dock) + var(--safe));padding:0 4px var(--safe);
+  display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line2)}
+.dk{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);border-top:2px solid transparent}
+.dk svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.dk.on{color:var(--accent);border-top-color:var(--accent);text-shadow:0 0 10px rgba(53,214,245,.55)}
+.dk .badge{position:absolute;margin-left:26px;margin-top:-22px;min-width:16px;height:16px;border-radius:8px;background:var(--crit);color:#fff;font-size:9px;display:grid;place-items:center;padding:0 4px}
+@media(min-width:900px){ .dock{position:sticky;bottom:auto;top:62px;height:auto;max-width:760px;margin:0 auto;border:1px solid var(--line2);padding:0;grid-template-columns:repeat(5,1fr)} .dk{padding:9px 0;flex-direction:row;gap:8px;font-size:10px} body{padding-bottom:20px} .wrap{gap:12px} }
+
+/* ---------- lock + modals ---------- */
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(4,9,14,.92);display:grid;place-items:start center;overflow:auto;padding:28px 14px}
+.card{width:min(460px,100%);background:var(--surface);border:1px solid var(--line2);box-shadow:0 20px 60px rgba(0,0,0,.6);padding:18px 18px 16px;
+  clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px))}
+.card h2{font-family:"Orbitron",monospace;font-size:13px;letter-spacing:.22em;color:var(--accent);margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.card h2 .logo{width:28px;height:28px}
+.stay{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);margin:4px 0 12px}
+.stay input{accent-color:var(--accent);width:16px;height:16px}
+.formerr{font-family:"IBM Plex Mono",monospace;font-size:11px;color:#ff8a8e;min-height:1.2em;margin-top:8px}
+.hint{font-size:11.5px;color:var(--ink3);line-height:1.5}
+.cardbtns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+.lockrestore{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:11.5px;color:var(--ink3)}
+.toast{position:fixed;left:50%;bottom:calc(var(--dock) + var(--safe) + 14px);transform:translateX(-50%);z-index:70;background:var(--surface);border:1px solid var(--accent);
+  box-shadow:var(--glow);padding:9px 14px;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--ink);opacity:0;transition:opacity .25s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+.toast.err{border-color:var(--crit)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="nlogo" viewBox="0 0 48 48"><circle cx="19" cy="24" r="12" fill="none" stroke="#35D6F5" stroke-width="2.4"/><circle cx="31" cy="24" r="12" fill="none" stroke="#35D6F5" stroke-width="2.4" opacity=".55"/><path d="M25 16.5 L25 31.5" stroke="#35D6F5" stroke-width="2.4" stroke-linecap="round"/><circle cx="25" cy="24" r="2.6" fill="#35D6F5"/></symbol>
+</svg>
+
+<!-- ============ lock screen ============ -->
+<div class="scrim" id="lock">
+  <div class="card panel"><i class="br"></i>
+    <h2><svg class="logo"><use href="#nlogo"/></svg><span id="lockTitle">ENTER PASSKEY</span></h2>
+    <div class="field"><label class="k" for="pk1">Passkey</label><input type="password" id="pk1" autocomplete="current-password"></div>
+    <div class="field" id="pk2wrap" hidden><label class="k" for="pk2">Confirm passkey</label><input type="password" id="pk2" autocomplete="new-password"></div>
+    <div class="field" id="nameWrap" hidden><label class="k" for="myName0">Your first name (how your partner sees you)</label><input type="text" id="myName0" maxlength="30" placeholder="e.g. Sam"></div>
+    <label class="stay"><input type="checkbox" id="stay"> <span>Stay unlocked on this device</span></label>
+    <button class="btn primary block big" id="unlockBtn">UNLOCK</button>
+    <div class="formerr" id="lockErr"></div>
+    <p class="hint">Your habits and your Telegram settings are encrypted with this passkey (PBKDF2 600k &rarr; AES-256-GCM) and stored only in this browser.
+      The passkey is never stored or sent anywhere; a wrong one simply fails to decrypt, and there is no recovery.
+      Without <b>Stay unlocked</b> the app locks itself when you close it or leave it in the background for a while.</p>
+    <div class="lockrestore">
+      <span>New device? Your data lives in the browser it was made in, not on a server. Restore a backup file to move it.</span>
+      <button class="mini" id="restoreBtn" type="button">Restore from a backup file&hellip;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ app ============ -->
+<div class="wrap" id="app" hidden>
+  <header class="top">
+    <span class="wordmark">NUDGE<small>ACCOUNTABILITY</small></span>
+    <span class="chips">
+      <span class="chip" id="chipPartner"><span class="dot"></span><span id="chipPartnerTxt">NO PARTNER</span></span>
+    </span>
+    <button class="mini" id="lockBtn" title="Lock and forget the key on this device">Lock</button>
+  </header>
+
+  <!-- ---- TODAY ---- -->
+  <section data-tab="today">
+    <div class="panel"><i class="br"></i>
+      <div class="today-head"><span class="date" id="todayDate">—</span><span class="sub" id="todaySub"></span></div>
+      <div id="todayList"></div>
+    </div>
+    <div class="sos" id="sosBox">
+      <div class="t">🚨 ABOUT TO RELAPSE?</div>
+      <p class="note" style="margin:0 0 8px">One tap tells <b id="sosPartner">your partner</b> on Telegram right now, with the habit at stake and a note from you. Use it before, not after.</p>
+      <button class="btn danger block big" id="sosBtn">I'M ABOUT TO RELAPSE &mdash; NUDGE MY PARTNER</button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="sendDailyBtn">📅 Send today's summary</button>
+      <button class="btn" id="sendWeeklyBtn">📊 Send weekly summary</button>
+    </div>
+    <p class="msg" id="todayMsg"></p>
+  </section>
+
+  <!-- ---- HABITS ---- -->
+  <section data-tab="habits" hidden>
+    <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">Habits</span><button class="mini acc" id="addHabitBtn">+ Add habit</button></div>
+      <div id="habitList"></div>
+    </div>
+    <div class="panel" id="habitDetail" hidden><i class="br"></i>
+      <div class="ph"><span class="k" id="hdTitle">Habit</span><span><button class="mini" id="hdEdit">Edit</button> <button class="mini" id="hdClose">Close</button></span></div>
+      <div class="pb">
+        <div class="stats" id="hdStats"></div>
+        <div class="calhead" id="calHead"></div>
+        <div class="cal" id="hdCal"></div>
+        <p class="note" id="hdNote">Tap a day to change it: unmarked &rarr; done &rarr; missed &rarr; unmarked. Build habits count a day only when you mark it done; break habits count a day clean unless you mark a slip.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- PARTNER ---- -->
+  <section data-tab="partner" hidden>
+    <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">Your Telegram bot</span><span class="k" id="botState">not set</span></div>
+      <div class="pb">
+        <p class="note">Your bot is the messenger: it delivers your summaries and relapse nudges to your partner. Create it with <b>@BotFather</b> (see the Guide), paste its token here. The token stays in your encrypted vault.</p>
+        <div class="field"><label class="k" for="botToken">Bot token</label><input type="password" id="botToken" placeholder="123456789:AA…" autocomplete="off" spellcheck="false"><div class="hint">Leave empty to keep the saved one.</div></div>
+        <div class="row"><button class="btn" id="botSaveBtn">Save &amp; check token</button><span class="msg" id="botMsg" style="margin:0"></span></div>
+      </div>
+    </div>
+    <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">Your partner</span><span class="k" id="partnerState">not linked</span></div>
+      <div class="pb">
+        <p class="note">Your partner opens Telegram, finds <b id="botHandle">your bot</b> and presses <b>Start</b> (or sends it any message). Then press <b>Find my partner</b> here and pick them.</p>
+        <div class="row"><button class="btn" id="findBtn">🔎 Find my partner</button><button class="btn" id="testBtn">✅ Send a test</button></div>
+        <div class="chatlist" id="chatList"></div>
+        <div class="field" style="margin-top:12px"><label class="k" for="partnerName">Partner's name (for your messages)</label><input type="text" id="partnerName" maxlength="30" placeholder="e.g. Alex"></div>
+        <div class="field"><label class="k" for="myName">Your name (how your partner sees you)</label><input type="text" id="myName" maxlength="30"></div>
+        <div class="row"><button class="btn" id="namesSaveBtn">Save names</button><span class="msg" id="partnerMsg" style="margin:0"></span></div>
+      </div>
+    </div>
+    <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">What gets sent</span></div>
+      <div class="pb">
+        <div class="toggle"><div><div class="tl">📅 Daily summary, automatically</div><div class="th">Sent once a day, the moment you have marked every habit for today.</div></div><input type="checkbox" id="autoDaily"></div>
+        <div class="toggle"><div><div class="tl">📊 Weekly summary, automatically</div><div class="th">Sent the first time you open the app in a new week, covering the week that ended.</div></div><input type="checkbox" id="autoWeekly"></div>
+        <div class="toggle"><div><div class="tl">🚨 Relapse nudges</div><div class="th">The red button on Today. Always sent immediately when you press it.</div></div><input type="checkbox" id="allowSos" checked></div>
+        <h2 class="sec">Sent log</h2>
+        <div class="log" id="sentLog"><div>nothing sent yet</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- GUIDE ---- -->
+  <section data-tab="guide" hidden>
+    <div class="panel guide"><i class="br"></i>
+      <div class="pb">
+        <h3>WHAT NUDGE IS</h3>
+        <p>Two people keep each other honest. Each of you tracks habits to <b>build</b> (do it every day) and habits to <b>break</b> (stay clean every day), as daily yes/no streaks with a progress bar toward a target. Your partner gets your daily and weekly summaries on Telegram, and a nudge the moment you press <b>About to relapse</b>.</p>
+        <p>There is no account and no server. Everything you type is encrypted in this browser with your passkey. The only thing that ever leaves the browser is a message you asked to send, straight to Telegram.</p>
+
+        <h3>1 · SET UP THE APP</h3>
+        <ol>
+          <li><b>Open this page</b> and set a passkey. It encrypts your data; there is no "forgot passkey", so keep it somewhere safe.</li>
+          <li>Tick <b>Stay unlocked on this device</b> if this is your own phone, so the app opens without asking. Otherwise it locks when you close it.</li>
+          <li>Enter your first name: that is how your partner will see you in messages.</li>
+          <li>Add your habits on the <b>Habits</b> tab. Pick an emoji, Build or Break, and a target in days (30, 66, 90, 365).</li>
+          <li>Every day, open <b>Today</b> and mark each habit. Build: did it or not. Break: clean or slipped.</li>
+          <li>Take a <b>backup</b> now and then (⚙ &rarr; Backup). The backup file is the encrypted vault; it opens with the same passkey on any device.</li>
+        </ol>
+
+        <h3>2 · SAVE IT TO YOUR HOME SCREEN</h3>
+        <p>Nudge is a web app. Saved to the Home Screen it opens full-screen like any app, works offline, and keeps its data (as long as you don't clear the browser's site data).</p>
+        <div class="box"><span class="k">iPhone / iPad (Safari)</span>Tap the <b>Share</b> button (the square with an arrow), scroll, tap <b>Add to Home Screen</b>, then <b>Add</b>. Open Nudge from the new icon from now on: Safari and the Home Screen app keep separate data.</div>
+        <div class="box"><span class="k">Android (Chrome)</span>Tap the <b>⋮ menu</b> &rarr; <b>Add to Home screen</b> (or <b>Install app</b>) &rarr; <b>Install</b>.</div>
+        <div class="box"><span class="k">Desktop (Chrome / Edge)</span>Click the <b>install</b> icon at the right end of the address bar, or menu &rarr; <b>Install Nudge</b>.</div>
+
+        <h3>3 · CONNECT TELEGRAM</h3>
+        <p>Each of you makes <b>your own bot</b>. Your bot is your messenger: your app sends your partner's Telegram the summaries and nudges through it. Your partner's app does the same through their bot. Nobody shares a token, nothing passes through a third server, and you keep chatting with each other directly in Telegram as usual.</p>
+        <div class="flow">YOU                              YOUR PARTNER
+  Nudge app ──(your bot)──▶   Telegram: "Sam's check-in 📅 …"
+  Telegram   ◀──(their bot)── Nudge app
+  You two talk in your normal Telegram chat.</div>
+        <p><b>Create your bot (2 minutes, each of you):</b></p>
+        <ol>
+          <li>In Telegram, open <b>@BotFather</b> and send <span class="mono">/newbot</span>.</li>
+          <li>Give it a name (e.g. <i>Sam's Nudge</i>) and a username ending in <span class="mono">bot</span> (e.g. <span class="mono">sam_nudge_bot</span>).</li>
+          <li>BotFather replies with a <b>token</b> like <span class="mono">123456789:AAH…</span>. Copy it.</li>
+          <li>In Nudge &rarr; <b>Partner</b>, paste the token and press <b>Save &amp; check token</b>. The app asks Telegram for the bot's name to confirm it works.</li>
+          <li>Send your bot's username to your partner. Your partner opens it in Telegram and presses <b>Start</b>.</li>
+          <li>Back in Nudge, press <b>Find my partner</b>: the app asks your bot who has messaged it and lists the chats. Pick your partner.</li>
+          <li>Press <b>Send a test</b>. Your partner should receive it within a second.</li>
+          <li>Your partner repeats the same steps with their own bot, and you press Start on theirs.</li>
+        </ol>
+        <div class="box"><span class="k">Tip</span>Optional: in BotFather, <span class="mono">/setuserpic</span> gives the bot a picture and <span class="mono">/setdescription</span> a line like "Sam's accountability nudges". Keep the token to yourself: anyone with it can send messages as that bot.</div>
+
+        <h3>4 · WHAT YOUR PARTNER RECEIVES</h3>
+        <ol>
+          <li><b>Daily summary</b>: once you have marked every habit for the day (automatic if enabled, or the button on Today).</li>
+          <li><b>Weekly summary</b>: days done per habit, streaks and bests for the week that ended (automatic on your first visit in a new week, or the button).</li>
+          <li><b>Relapse nudge</b>: the red button, immediately, with the habit at stake and your note. Agree with your partner what they do when it arrives: call, reply, meet.</li>
+        </ol>
+
+        <h3>5 · TROUBLESHOOTING</h3>
+        <ol>
+          <li><b>"Unauthorized" when saving the token</b>: the token was copied wrong or revoked. Ask BotFather for <span class="mono">/token</span> again.</li>
+          <li><b>Find my partner finds nobody</b>: your partner must message the bot first (press Start). Telegram only keeps those messages for 24 hours, so press Find soon after.</li>
+          <li><b>"Forbidden: bot was blocked by the user"</b>: your partner blocked or deleted the bot chat; they need to Start it again.</li>
+          <li><b>Nothing arrives</b>: check the Sent log on the Partner tab for the error text, and the phone has internet. Messages are sent only while the app is open and you act.</li>
+          <li><b>Lost passkey</b>: there is no recovery. Clear the browser's site data (or ⚙ &rarr; Reset) and set up again from a backup you can open, or from scratch.</li>
+        </ol>
+
+        <h3>6 · PRIVACY MODEL</h3>
+        <p>The page is static (it is served from GitHub Pages and contains nothing of yours). Your vault is one encrypted blob in this browser's storage; the key comes from your passkey and is never stored (unless you choose Stay unlocked, which keeps a non-extractable copy of the derived key in this browser only). Telegram sees exactly the messages you send and nothing else. The Sent log is in the vault too.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---- SETTINGS ---- -->
+  <section data-tab="settings" hidden>
+    <div class="panel"><i class="br"></i>
+      <div class="ph"><span class="k">Settings</span></div>
+      <div class="pb">
+        <div class="field"><label class="k">Week starts on</label><div class="seg" id="weekStart"><button data-ws="1">Monday</button><button data-ws="0">Sunday</button><button data-ws="6">Saturday</button></div></div>
+        <h2 class="sec">Vault</h2>
+        <div class="actions" style="margin-top:4px">
+          <button class="btn" id="backupBtn">💾 Backup</button>
+          <button class="btn" id="restoreBtn2">📂 Restore</button>
+          <button class="btn" id="pkBtn">🔑 Change passkey</button>
+          <button class="btn" id="lockBtn2">🔒 Lock</button>
+        </div>
+        <p class="note">Backups are the encrypted vault file; restoring on another device asks for the same passkey. Take one after any change you would hate to lose.</p>
+        <h2 class="sec">Danger zone</h2>
+        <button class="btn danger" id="resetBtn">Delete everything on this device</button>
+        <p class="note">Wipes the vault from this browser. Your partner's app is not affected.</p>
+        <h2 class="sec">About</h2>
+        <p class="note">Nudge · static page, no server, no account. Theme: the Batcomputer HUD. Source and licence in the README.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="dock" id="dock" aria-label="Screens">
+  <button class="dk on" data-tab="today"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="1.5"/><path d="M3 9h18M8 2v4M16 2v4M8 14l2.5 2.5L16 11"/></svg>Today<span class="badge" id="todayBadge" hidden></span></button>
+  <button class="dk" data-tab="habits"><svg viewBox="0 0 24 24"><path d="M4 6h10M4 12h16M4 18h12"/><circle cx="19" cy="6" r="2"/></svg>Habits</button>
+  <button class="dk" data-tab="partner"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5c3 .3 5.5 2.6 5.5 5.5"/></svg>Partner</button>
+  <button class="dk" data-tab="guide"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H12v16H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H12v16h5.5A2.5 2.5 0 0 1 20 21z"/></svg>Guide</button>
+  <button class="dk" data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>More</button>
+</nav>
+
+<!-- ============ modals ============ -->
+<div class="scrim" id="habitModal" hidden>
+  <div class="card panel"><i class="br"></i>
+    <h2 id="hmTitle">NEW HABIT</h2>
+    <div class="field"><label class="k">Type</label><div class="seg" id="hmType"><button data-type="build">🌱 Build</button><button data-type="break">🧊 Break</button></div>
+      <div class="hint" id="hmTypeHint">Build: something to do every day. Break: something to stay clean from every day.</div></div>
+    <div class="field"><label class="k" for="hmName">Name</label><input type="text" id="hmName" maxlength="40" placeholder="e.g. Morning run · No sugar"></div>
+    <div class="field"><label class="k">Emoji</label><div class="emos" id="hmEmos"></div></div>
+    <div class="field"><label class="k" for="hmTarget">Target (days)</label><div class="row"><input type="number" id="hmTarget" min="1" max="3650" value="30" style="width:110px"><span class="seg" id="hmTargets"><button data-t="21">21</button><button data-t="30">30</button><button data-t="66">66</button><button data-t="90">90</button><button data-t="365">365</button></span></div></div>
+    <div class="field"><label class="k" for="hmStart">Start date</label><input type="date" id="hmStart"><div class="hint">Days before the start are not counted.</div></div>
+    <div class="field"><label class="k" for="hmNote">Why (optional, shown to you)</label><textarea id="hmNote" maxlength="300" placeholder="The reason you will read on a hard day."></textarea></div>
+    <div class="formerr" id="hmErr"></div>
+    <div class="cardbtns"><button class="btn danger" id="hmDelete" hidden>Delete</button><button class="btn" id="hmCancel">Cancel</button><button class="btn primary" id="hmSave">Save</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="sosModal" hidden>
+  <div class="card panel"><i class="br"></i>
+    <h2>🚨 ABOUT TO RELAPSE</h2>
+    <div class="field"><label class="k" for="sosHabit">Which habit</label><select id="sosHabit"></select></div>
+    <div class="field"><label class="k" for="sosNote">A line for your partner (optional)</label><textarea id="sosNote" maxlength="400" placeholder="Where you are, what's going on, what would help."></textarea></div>
+    <p class="hint">This sends a Telegram message to <b id="sosTo">your partner</b> right now and is noted in your Sent log. The habit is not marked as slipped; you decide that on Today.</p>
+    <div class="formerr" id="sosErr"></div>
+    <div class="cardbtns"><button class="btn" id="sosCancel">Cancel</button><button class="btn danger" id="sosSend">Send the nudge now</button></div>
+  </div>
+</div>
+
+<div class="scrim" id="pkModal" hidden>
+  <div class="card panel"><i class="br"></i>
+    <h2>CHANGE PASSKEY</h2>
+    <div class="field"><label class="k" for="pkCur">Current passkey</label><input type="password" id="pkCur" autocomplete="current-password"></div>
+    <div class="field"><label class="k" for="pkNew">New passkey</label><input type="password" id="pkNew" autocomplete="new-password"></div>
+    <div class="field"><label class="k" for="pkNew2">Confirm new passkey</label><input type="password" id="pkNew2" autocomplete="new-password"></div>
+    <div class="formerr" id="pkErr"></div>
+    <div class="cardbtns"><button class="btn" id="pkCancelBtn">Cancel</button><button class="btn primary" id="pkSaveBtn">Change passkey</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =========================================================================
+   helpers
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseKey = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (k, n) => { const d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
+const todayKey = () => keyOf(new Date());
+const fmtDate = (k, opts) => parseKey(k).toLocaleDateString(undefined, opts || { weekday:'long', day:'numeric', month:'long' });
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const EMOJIS = ['🏃','💪','🧘','📚','💧','🥗','😴','🧹','✍️','🎯','🌅','🚭','🍬','🍺','📵','🎮','☕','🛒','💸','🧠','🙏','🌱','🧊','🔥','❤️','⭐'];
+let toastT = null;
+function toast(text, err){ const t = $('toast'); t.textContent = text; t.className = 'toast show' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), err ? 5000 : 2600); }
+function setMsg(id, text, cls){ const m = $(id); m.textContent = text || ''; m.className = 'msg' + (cls ? ' ' + cls : ''); }
+
+/* =========================================================================
+   state (what the vault holds)
+   ========================================================================= */
+const BLANK = () => ({ v:1, me:{ name:'' }, partner:{ name:'', chatId:'', chatName:'' }, bot:{ token:'', username:'' },
+  habits:[], settings:{ autoDaily:true, autoWeekly:true, allowSos:true, weekStart:1, lastDaily:'', lastWeekly:'' }, log:[] });
+let S = BLANK();
+let currentTab = 'today', detailId = null;
+
+/* =========================================================================
+   encrypted vault — the pattern from Kryptonite Profile: one AES-256-GCM blob in
+   localStorage, key from the passkey by PBKDF2-HMAC-SHA256 (600k, random salt);
+   authentication is the GCM tag. "Stay unlocked" keeps the derived key as a
+   non-extractable CryptoKey in IndexedDB; LOCK forgets it.
+   ========================================================================= */
+const VAULT = 'nudge-vault', ITERS = 600000;
+let vaultKey = null, vaultSalt = null;
+const te = new TextEncoder(), td = new TextDecoder();
+const b64 = a => btoa(String.fromCharCode(...new Uint8Array(a)));
+const unb64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+async function deriveKey(pass, salt){
+  const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations:ITERS, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+async function sealVault(key, salt){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, te.encode(JSON.stringify(S)));
+  return JSON.stringify({ app:'nudge', v:1, iters:ITERS, salt:b64(salt), iv:b64(iv), ct:b64(ct) });
+}
+async function decryptVault(key, v){
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: unb64(v.iv) }, key, unb64(v.ct));
+  return JSON.parse(td.decode(pt));
+}
+let saveChain = Promise.resolve();
+function save(){
+  if (!vaultKey) return saveChain;
+  saveChain = saveChain.then(async () => { localStorage.setItem(VAULT, await sealVault(vaultKey, vaultSalt)); }).catch(() => toast('Could not save: storage blocked?', true));
+  return saveChain;
+}
+async function openVault(pass){
+  const raw = localStorage.getItem(VAULT);
+  if (!raw) { vaultSalt = crypto.getRandomValues(new Uint8Array(16)); vaultKey = await deriveKey(pass, vaultSalt); S = BLANK(); await save(); return S; }
+  const v = JSON.parse(raw), salt = unb64(v.salt), key = await deriveKey(pass, salt);
+  const data = await decryptVault(key, v);
+  vaultSalt = salt; vaultKey = key;
+  return data;
+}
+const KDB = 'nudge-keys', KSTORE = 'keys', KID = 'remembered';
+function keyStore(mode, op){
+  return new Promise((resolve, reject) => {
+    let req; try { req = indexedDB.open(KDB, 1); } catch (e) { return reject(e); }
+    req.onupgradeneeded = () => req.result.createObjectStore(KSTORE);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { const db = req.result, tx = db.transaction(KSTORE, mode), r = op(tx.objectStore(KSTORE));
+      tx.oncomplete = () => { db.close(); resolve(r ? r.result : undefined); }; tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); }; };
+  });
+}
+const rememberKey = key => keyStore('readwrite', s => s.put(key, KID)).catch(() => {});
+const recallKey   = ()  => keyStore('readonly',  s => s.get(KID)).catch(() => null);
+const forgetKey   = ()  => keyStore('readwrite', s => s.delete(KID)).catch(() => {});
+
+/* ---------- lock screen ---------- */
+const lockEl = $('lock'), pk1 = $('pk1'), pk2 = $('pk2'), lockErr = $('lockErr'), unlockBtn = $('unlockBtn');
+const firstRun = !localStorage.getItem(VAULT);
+let remembered = false;
+if (firstRun) { $('lockTitle').textContent = 'SET A PASSKEY'; $('pk2wrap').hidden = false; $('nameWrap').hidden = false; unlockBtn.textContent = 'CREATE MY VAULT'; }
+function adopt(data){
+  const b = BLANK();
+  S = { ...b, ...data, me:{ ...b.me, ...(data.me||{}) }, partner:{ ...b.partner, ...(data.partner||{}) }, bot:{ ...b.bot, ...(data.bot||{}) },
+        settings:{ ...b.settings, ...(data.settings||{}) }, habits: Array.isArray(data.habits) ? data.habits : [], log: Array.isArray(data.log) ? data.log : [] };
+  for (const h of S.habits) { h.days ||= {}; h.target = Math.max(1, +h.target || 30); h.type = h.type === 'break' ? 'break' : 'build'; h.start ||= todayKey(); }
+}
+function enter(data){
+  adopt(data);
+  pk1.value = ''; pk2.value = '';
+  lockEl.hidden = true; $('app').hidden = false;
+  renderAll();
+  if (firstRun) showTab(S.habits.length ? 'today' : 'guide');
+  autoWeekly();
+}
+async function unlock(){
+  lockErr.textContent = '';
+  const pass = pk1.value;
+  if (!pass) { lockErr.textContent = 'Enter the passkey.'; return; }
+  if (firstRun && pass !== pk2.value) { lockErr.textContent = 'The two passkeys do not match.'; return; }
+  if (firstRun && pass.length < 6) { lockErr.textContent = 'Use at least 6 characters.'; return; }
+  unlockBtn.disabled = true; unlockBtn.textContent = 'DERIVING KEY…';
+  try {
+    const data = await openVault(pass);
+    if (firstRun) { data.me.name = $('myName0').value.trim(); S = data; await save(); }
+    remembered = $('stay').checked;
+    if (remembered) await rememberKey(vaultKey); else await forgetKey();
+    enter(data);
+  } catch (e) { lockErr.textContent = 'That passkey does not decrypt the saved data.'; }
+  finally { unlockBtn.disabled = false; unlockBtn.textContent = firstRun ? 'CREATE MY VAULT' : 'UNLOCK'; }
+}
+async function tryRemembered(){
+  if (firstRun) return false;
+  const key = await recallKey(); if (!key) return false;
+  try { const v = JSON.parse(localStorage.getItem(VAULT)); const data = await decryptVault(key, v); vaultKey = key; vaultSalt = unb64(v.salt); remembered = true; enter(data); return true; }
+  catch (e) { forgetKey(); return false; }
+}
+async function lockNow(){ vaultKey = null; await forgetKey(); location.reload(); }
+unlockBtn.addEventListener('click', unlock);
+[pk1, pk2, $('myName0')].forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); }));
+$('lockBtn').addEventListener('click', lockNow); $('lockBtn2').addEventListener('click', lockNow);
+/* not remembered: lock when the app has been in the background for a while */
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (!remembered && vaultKey && hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000) { vaultKey = null; location.reload(); }
+});
+
+/* ---------- change passkey / backup / restore / reset ---------- */
+const pkModal = $('pkModal');
+function openPk(){ $('pkErr').textContent = ''; pkModal.hidden = false; $('pkCur').focus(); }
+function closePk(){ pkModal.hidden = true; ['pkCur','pkNew','pkNew2'].forEach(i => $(i).value = ''); }
+async function changePasskey(){
+  const cur = $('pkCur').value, next = $('pkNew').value, err = $('pkErr'); err.textContent = '';
+  if (!cur) return err.textContent = 'Enter the current passkey.';
+  if (next.length < 6) return err.textContent = 'Use at least 6 characters.';
+  if (next !== $('pkNew2').value) return err.textContent = 'The two new passkeys do not match.';
+  $('pkSaveBtn').disabled = true;
+  try {
+    const v = JSON.parse(localStorage.getItem(VAULT));
+    try { await decryptVault(await deriveKey(cur, unb64(v.salt)), v); } catch (e) { err.textContent = 'That is not the current passkey.'; return; }
+    const salt = crypto.getRandomValues(new Uint8Array(16)), key = await deriveKey(next, salt);
+    localStorage.setItem(VAULT, await sealVault(key, salt));
+    vaultKey = key; vaultSalt = salt;
+    if (await recallKey()) await rememberKey(key);
+    closePk(); toast('Passkey changed. Take a fresh backup.');
+  } catch (e) { err.textContent = 'Could not change the passkey.'; }
+  finally { $('pkSaveBtn').disabled = false; }
+}
+$('pkBtn').addEventListener('click', openPk); $('pkCancelBtn').addEventListener('click', closePk); $('pkSaveBtn').addEventListener('click', changePasskey);
+pkModal.addEventListener('click', e => { if (e.target === pkModal) closePk(); });
+function downloadFile(name, text){ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type:'application/json' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+$('backupBtn').addEventListener('click', () => { const raw = localStorage.getItem(VAULT); if (raw) downloadFile(`nudge-backup-${todayKey()}.json`, raw); });
+function importVault(){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json';
+  inp.addEventListener('change', async () => {
+    const f = inp.files[0]; if (!f) return;
+    try { const text = await f.text(); const v = JSON.parse(text); if (!v || !v.salt || !v.iv || !v.ct) throw 0; localStorage.setItem(VAULT, text); await forgetKey(); location.reload(); }
+    catch (e) { lockErr.textContent = 'That is not a valid backup file.'; toast('That is not a valid backup file.', true); }
+  });
+  inp.click();
+}
+$('restoreBtn').addEventListener('click', importVault); $('restoreBtn2').addEventListener('click', importVault);
+$('resetBtn').addEventListener('click', async () => {
+  if (!confirm('Delete the vault from this browser? Your habits, history and Telegram settings here are gone for good unless you have a backup.')) return;
+  localStorage.removeItem(VAULT); await forgetKey(); location.reload();
+});
+
+/* =========================================================================
+   streak maths
+   build:  a day counts only when marked done; today unmarked = still open
+   break:  a day is clean unless marked as a slip
+   ========================================================================= */
+function val(h, k){ const v = h.days[k]; return v === 1 || v === 0 ? v : null; }
+function counts(h, k){ const v = val(h, k); if (v !== null) return v; return h.type === 'break' ? 1 : 0; }
+function streak(h, upto){
+  const today = upto || todayKey();
+  let k = today, n = 0;
+  if (h.type === 'build' && val(h, today) === null) k = addDays(today, -1);
+  while (k >= h.start) { if (counts(h, k) === 1) { n++; k = addDays(k, -1); } else break; }
+  return n;
+}
+function bestStreak(h){
+  const today = todayKey(); let k = h.start, run = 0, best = 0;
+  while (k <= today) { if (counts(h, k) === 1 && !(h.type === 'build' && k === today && val(h, k) === null)) { run++; if (run > best) best = run; } else if (!(k === today && val(h, k) === null)) run = 0; k = addDays(k, 1); }
+  return best;
+}
+function tally(h, from, to){ let done = 0, slips = 0, days = 0; let k = from < h.start ? h.start : from; while (k <= to) { days++; const c = counts(h, k); if (c === 1) done++; else slips++; k = addDays(k, 1); } return { done, slips, days }; }
+function weekBounds(anchor, offsetWeeks){
+  const ws = S.settings.weekStart, d = parseKey(anchor); const diff = (d.getDay() - ws + 7) % 7; d.setDate(d.getDate() - diff + 7 * (offsetWeeks || 0));
+  const start = keyOf(d); return { start, end: addDays(start, 6) };
+}
+function allMarkedToday(){ const t = todayKey(); return S.habits.length > 0 && S.habits.every(h => val(h, t) !== null); }
+
+/* =========================================================================
+   rendering
+   ========================================================================= */
+function renderAll(){ renderToday(); renderHabits(); renderPartner(); renderSettings(); }
+function renderToday(){
+  const t = todayKey();
+  $('todayDate').textContent = fmtDate(t).toUpperCase();
+  const marked = S.habits.filter(h => val(h, t) !== null).length;
+  $('todaySub').textContent = S.habits.length ? `${marked} / ${S.habits.length} marked` : '';
+  $('todayBadge').hidden = !(S.habits.length - marked > 0); $('todayBadge').textContent = S.habits.length - marked;
+  const list = $('todayList');
+  if (!S.habits.length) { list.innerHTML = `<div class="empty"><b>NO HABITS YET</b>Add your first habit on the Habits tab. 🌱 Build one, 🧊 break one.</div>`; }
+  else list.innerHTML = S.habits.map(h => {
+    const v = val(h, t), st = streak(h), pct = Math.min(100, Math.round(st / h.target * 100)), brk = h.type === 'break';
+    const yesLbl = brk ? 'Clean today' : 'Did it', noLbl = brk ? 'Slipped' : 'Not today';
+    return `<div class="hab" data-id="${h.id}">
+      <div class="emo">${esc(h.emoji || (brk ? '🧊' : '🌱'))}</div>
+      <div><div><span class="nm">${esc(h.name)}</span><span class="typ ${h.type}">${brk ? 'break' : 'build'}</span></div>
+        <div class="st">🔥 <b>${st}</b> day${st === 1 ? '' : 's'} ${brk ? 'clean' : 'streak'} · best ${bestStreak(h)}</div></div>
+      <div class="yn"><button class="yes${v === 1 ? ' on' : ''}" data-v="1" title="${yesLbl}">✅</button><button class="no${v === 0 ? ' on' : ''}" data-v="0" title="${noLbl}">${brk ? '💥' : '❌'}</button></div>
+      <div class="bar ${brk ? 'break' : ''}${pct >= 100 ? ' done' : ''}"><i style="width:${pct}%"></i></div>
+      <div class="barlbl"><span>${st} / ${h.target} days${pct >= 100 ? ' · 🏆 target reached' : ''}</span><span>${pct}%</span></div>
+    </div>`;
+  }).join('');
+  const linked = !!(S.bot.token && S.partner.chatId);
+  $('sosPartner').textContent = S.partner.name || 'your partner';
+  $('sosBox').hidden = !S.habits.some(h => h.type === 'break') && !S.habits.length;
+  $('sosBtn').disabled = !linked || !S.settings.allowSos;
+  $('sendDailyBtn').disabled = !linked || !S.habits.length; $('sendWeeklyBtn').disabled = !linked || !S.habits.length;
+  setMsg('todayMsg', linked ? '' : 'Link your partner on the Partner tab to send summaries and nudges.');
+}
+$('todayList').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-v]'); if (!b) return;
+  const id = b.closest('[data-id]').dataset.id, h = S.habits.find(x => x.id === id); if (!h) return;
+  const t = todayKey(), v = +b.dataset.v;
+  if (val(h, t) === v) delete h.days[t]; else h.days[t] = v;
+  await save(); renderToday(); if (detailId === id) renderDetail();
+  if (v === 0 && h.type === 'break') toast('Noted. A slip is a data point, not the end. 💙');
+  if (allMarkedToday() && S.settings.autoDaily && S.bot.token && S.partner.chatId && S.settings.lastDaily !== t) sendDaily(true);
+});
+
+function renderHabits(){
+  const list = $('habitList');
+  if (!S.habits.length) { list.innerHTML = `<div class="empty"><b>EMPTY</b>Press + Add habit. Examples: 🏃 Morning run (build), 🍬 No sugar (break).</div>`; return; }
+  list.innerHTML = S.habits.map(h => `<div class="hl" data-id="${h.id}">
+    <div class="emo">${esc(h.emoji || (h.type === 'break' ? '🧊' : '🌱'))}</div>
+    <div><div><span class="nm" style="font-weight:600">${esc(h.name)}</span><span class="typ ${h.type}" style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin-left:8px;color:${h.type === 'break' ? 'var(--warn)' : 'var(--accent)'}">${h.type}</span></div>
+      <div class="meta">🔥 ${streak(h)} / ${h.target} · best ${bestStreak(h)} · since ${fmtDate(h.start, { day:'numeric', month:'short', year:'numeric' })}</div></div>
+    <span class="mini">Open</span></div>`).join('');
+}
+$('habitList').addEventListener('click', e => { const r = e.target.closest('[data-id]'); if (r) { detailId = r.dataset.id; renderDetail(); $('habitDetail').scrollIntoView({ behavior:'smooth', block:'start' }); } });
+const DOW = ['S','M','T','W','T','F','S'];
+function renderDetail(){
+  const h = S.habits.find(x => x.id === detailId); const box = $('habitDetail');
+  if (!h) { box.hidden = true; return; }
+  box.hidden = false;
+  $('hdTitle').textContent = `${h.emoji || ''} ${h.name}`.trim();
+  const t = todayKey(), st = streak(h), bs = bestStreak(h), all = tally(h, h.start, t);
+  const rate = all.days ? Math.round(all.done / all.days * 100) : 0;
+  $('hdStats').innerHTML = `<div class="stat"><b>${st}</b><span>streak</span></div><div class="stat"><b>${bs}</b><span>best</span></div><div class="stat"><b>${all.done}</b><span>${h.type === 'break' ? 'clean days' : 'days done'}</span></div><div class="stat"><b>${rate}%</b><span>rate</span></div>`;
+  const ws = S.settings.weekStart;
+  $('calHead').innerHTML = Array.from({ length:7 }, (_, i) => `<span class="k">${DOW[(ws + i) % 7]}</span>`).join('');
+  const { start: wk } = weekBounds(t, -11);                                      // 12 weeks ending this week
+  let html = '', k = wk;
+  for (let i = 0; i < 84; i++) {
+    const v = val(h, k), future = k > t, pre = k < h.start;
+    const cls = future ? 'future' : pre ? 'pre' : v === 1 ? 'yes' : v === 0 ? 'no' : (h.type === 'break' ? 'clean' : '');
+    html += `<div class="d ${cls}${k === t ? ' today' : ''}" data-k="${k}" title="${k}">${parseKey(k).getDate()}</div>`;
+    k = addDays(k, 1);
+  }
+  $('hdCal').innerHTML = html;
+  $('hdNote').textContent = h.note ? `Why: ${h.note}` : 'Tap a day to change it: unmarked → done → missed → unmarked. Build habits count a day only when you mark it done; break habits count a day clean unless you mark a slip.';
+}
+$('hdCal').addEventListener('click', async e => {
+  const c = e.target.closest('.d'); if (!c || c.classList.contains('future') || c.classList.contains('pre')) return;
+  const h = S.habits.find(x => x.id === detailId); if (!h) return;
+  const k = c.dataset.k, v = val(h, k);
+  if (v === null) h.days[k] = 1; else if (v === 1) h.days[k] = 0; else delete h.days[k];
+  await save(); renderDetail(); renderToday(); renderHabits();
+});
+$('hdClose').addEventListener('click', () => { detailId = null; $('habitDetail').hidden = true; });
+$('hdEdit').addEventListener('click', () => openHabit(detailId));
+
+/* ---------- habit editor ---------- */
+const hm = $('habitModal'); let hmId = null, hmType = 'build', hmEmoji = '';
+$('hmEmos').innerHTML = EMOJIS.map(e => `<button type="button" data-e="${e}">${e}</button>`).join('');
+function openHabit(id){
+  hmId = id || null; const h = id ? S.habits.find(x => x.id === id) : null;
+  $('hmTitle').textContent = h ? 'EDIT HABIT' : 'NEW HABIT';
+  hmType = h ? h.type : 'build'; hmEmoji = h ? (h.emoji || '') : '';
+  $('hmName').value = h ? h.name : ''; $('hmTarget').value = h ? h.target : 30; $('hmStart').value = h ? h.start : todayKey(); $('hmNote').value = h ? (h.note || '') : '';
+  $('hmDelete').hidden = !h; $('hmErr').textContent = '';
+  paintHm(); hm.hidden = false; $('hmName').focus();
+}
+function paintHm(){
+  [...$('hmType').children].forEach(b => b.classList.toggle('on', b.dataset.type === hmType));
+  [...$('hmEmos').children].forEach(b => b.classList.toggle('on', b.dataset.e === hmEmoji));
+  [...$('hmTargets').children].forEach(b => b.classList.toggle('on', +b.dataset.t === +$('hmTarget').value));
+  $('hmTypeHint').textContent = hmType === 'break' ? 'Break: something to stay clean from, every day. A slip resets the streak.' : 'Build: something to do every day. A missed day resets the streak.';
+}
+$('hmType').addEventListener('click', e => { const b = e.target.closest('[data-type]'); if (b) { hmType = b.dataset.type; paintHm(); } });
+$('hmEmos').addEventListener('click', e => { const b = e.target.closest('[data-e]'); if (b) { hmEmoji = hmEmoji === b.dataset.e ? '' : b.dataset.e; paintHm(); } });
+$('hmTargets').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) { $('hmTarget').value = b.dataset.t; paintHm(); } });
+$('hmTarget').addEventListener('input', paintHm);
+$('hmCancel').addEventListener('click', () => hm.hidden = true);
+hm.addEventListener('click', e => { if (e.target === hm) hm.hidden = true; });
+$('hmSave').addEventListener('click', async () => {
+  const name = $('hmName').value.trim(), target = Math.max(1, Math.min(3650, +$('hmTarget').value || 30)), start = $('hmStart').value || todayKey();
+  if (!name) return $('hmErr').textContent = 'Give the habit a name.';
+  if (start > todayKey()) return $('hmErr').textContent = 'The start date cannot be in the future.';
+  if (hmId) { const h = S.habits.find(x => x.id === hmId); Object.assign(h, { name, type:hmType, emoji:hmEmoji, target, start, note:$('hmNote').value.trim() }); }
+  else S.habits.push({ id:uid(), name, type:hmType, emoji:hmEmoji, target, start, note:$('hmNote').value.trim(), created:todayKey(), days:{} });
+  await save(); hm.hidden = true; renderAll(); if (detailId) renderDetail(); toast(hmId ? 'Habit updated' : 'Habit added 🌱');
+});
+$('hmDelete').addEventListener('click', async () => {
+  const h = S.habits.find(x => x.id === hmId); if (!h) return;
+  if (!confirm(`Delete "${h.name}" and its history?`)) return;
+  S.habits = S.habits.filter(x => x.id !== hmId); if (detailId === hmId) detailId = null;
+  await save(); hm.hidden = true; renderAll(); $('habitDetail').hidden = true;
+});
+$('addHabitBtn').addEventListener('click', () => openHabit(null));
+
+/* =========================================================================
+   Telegram — Bot API straight from the browser (form-encoded POST: no preflight,
+   and api.telegram.org answers with Access-Control-Allow-Origin: *)
+   ========================================================================= */
+async function tg(method, params){
+  if (!S.bot.token) throw new Error('no bot token saved');
+  const r = await fetch(`https://api.telegram.org/bot${S.bot.token}/${method}`, { method:'POST', body:new URLSearchParams(params || {}) });
+  const j = await r.json().catch(() => ({ ok:false, description:'bad response' }));
+  if (!j.ok) throw new Error(j.description || ('HTTP ' + r.status));
+  return j.result;
+}
+function logSent(kind, text, ok, err){ S.log.unshift({ t:Date.now(), kind, text:text.slice(0, 140), ok, err: err ? String(err).slice(0, 120) : '' }); S.log.length = Math.min(S.log.length, 30); }
+async function sendToPartner(kind, text){
+  if (!S.bot.token || !S.partner.chatId) throw new Error('partner not linked');
+  try { await tg('sendMessage', { chat_id:S.partner.chatId, text }); logSent(kind, text, true); await save(); renderLog(); return true; }
+  catch (e) { logSent(kind, text, false, e.message); await save(); renderLog(); throw e; }
+}
+const me = () => S.me.name || 'Your partner';
+function dailyText(){
+  const t = todayKey(); const lines = [`📅 ${me()}'s check-in · ${fmtDate(t, { weekday:'short', day:'numeric', month:'short' })}`];
+  let on = 0;
+  for (const h of S.habits) { const v = val(h, t), st = streak(h), brk = h.type === 'break';
+    const mark = v === 1 ? '✅' : v === 0 ? (brk ? '💥' : '❌') : '⬜'; if (v === 1) on++;
+    lines.push(`${mark} ${h.emoji || ''} ${h.name} — ${v === 0 ? (brk ? 'slipped, streak reset' : 'missed, streak reset') : `🔥 ${st}/${h.target} ${brk ? 'clean' : ''}`.trim()}`); }
+  lines.push(`${on}/${S.habits.length} on track today.`);
+  return lines.join('\n');
+}
+function weeklyText(offset){
+  const { start, end } = weekBounds(todayKey(), offset || 0), lastDay = end > todayKey() ? todayKey() : end;
+  const lines = [`📊 ${me()}'s week · ${fmtDate(start, { day:'numeric', month:'short' })} – ${fmtDate(end, { day:'numeric', month:'short' })}`];
+  for (const h of S.habits) { const w = tally(h, start, lastDay), brk = h.type === 'break';
+    lines.push(`${h.emoji || (brk ? '🧊' : '🌱')} ${h.name}: ${brk ? `clean ${w.done}/${w.days}${w.slips ? `, ${w.slips} slip${w.slips === 1 ? '' : 's'}` : ''}` : `${w.done}/${w.days} days`} · 🔥 ${streak(h, lastDay)} · best ${bestStreak(h)}`); }
+  return lines.join('\n');
+}
+async function sendDaily(auto){
+  try { await sendToPartner('daily', dailyText()); S.settings.lastDaily = todayKey(); await save(); toast(auto ? `Daily summary sent to ${S.partner.name || 'your partner'} 📅` : 'Daily summary sent 📅'); }
+  catch (e) { toast('Could not send: ' + e.message, true); }
+}
+async function sendWeekly(offset, auto){
+  try { await sendToPartner('weekly', weeklyText(offset)); if (offset === -1 || auto) { S.settings.lastWeekly = weekBounds(todayKey(), 0).start; await save(); } toast('Weekly summary sent 📊'); }
+  catch (e) { toast('Could not send: ' + e.message, true); }
+}
+function autoWeekly(){                       // first visit in a new week: send last week's summary
+  if (!S.settings.autoWeekly || !S.bot.token || !S.partner.chatId || !S.habits.length) return;
+  const thisWeek = weekBounds(todayKey(), 0).start;
+  if (S.settings.lastWeekly === thisWeek) return;
+  const oldest = S.habits.reduce((m, h) => h.start < m ? h.start : m, todayKey());
+  if (oldest >= thisWeek) { S.settings.lastWeekly = thisWeek; save(); return; }   // nothing before this week to report
+  sendWeekly(-1, true);
+}
+$('sendDailyBtn').addEventListener('click', () => sendDaily(false));
+$('sendWeeklyBtn').addEventListener('click', () => sendWeekly(0, false));
+
+/* ---------- relapse nudge ---------- */
+const sosM = $('sosModal');
+$('sosBtn').addEventListener('click', () => {
+  const sel = $('sosHabit'); const hs = S.habits.filter(h => h.type === 'break').concat(S.habits.filter(h => h.type === 'build'));
+  sel.innerHTML = hs.map(h => `<option value="${h.id}">${esc((h.emoji || '') + ' ' + h.name)} · 🔥 ${streak(h)} days</option>`).join('') + `<option value="">(something else)</option>`;
+  $('sosNote').value = ''; $('sosErr').textContent = ''; $('sosTo').textContent = S.partner.name || 'your partner'; sosM.hidden = false; $('sosNote').focus();
+});
+$('sosCancel').addEventListener('click', () => sosM.hidden = true);
+sosM.addEventListener('click', e => { if (e.target === sosM) sosM.hidden = true; });
+$('sosSend').addEventListener('click', async () => {
+  const h = S.habits.find(x => x.id === $('sosHabit').value), note = $('sosNote').value.trim();
+  const text = [`🚨 ${me()} is about to relapse${h ? `: ${h.emoji || ''} ${h.name}` : ''}`, h ? `Streak at stake: 🔥 ${streak(h)} days (target ${h.target}).` : '', note ? `"${note}"` : '', 'Reach out now 🙏'].filter(Boolean).join('\n');
+  $('sosSend').disabled = true;
+  try { await sendToPartner('sos', text); sosM.hidden = true; toast(`Sent. ${S.partner.name || 'Your partner'} has it. Hold on. 💙`); }
+  catch (e) { $('sosErr').textContent = 'Could not send: ' + e.message; }
+  finally { $('sosSend').disabled = false; }
+});
+
+/* ---------- partner tab ---------- */
+function renderPartner(){
+  const hasBot = !!S.bot.token, linked = hasBot && !!S.partner.chatId;
+  $('botState').textContent = hasBot ? (S.bot.username ? '@' + S.bot.username : 'saved') : 'not set';
+  $('botHandle').textContent = S.bot.username ? '@' + S.bot.username : 'your bot';
+  $('partnerState').textContent = linked ? `linked · ${S.partner.chatName || S.partner.chatId}` : 'not linked';
+  $('findBtn').disabled = !hasBot; $('testBtn').disabled = !linked;
+  $('partnerName').value = S.partner.name || ''; $('myName').value = S.me.name || '';
+  $('autoDaily').checked = !!S.settings.autoDaily; $('autoWeekly').checked = !!S.settings.autoWeekly; $('allowSos').checked = !!S.settings.allowSos;
+  const chip = $('chipPartner'); chip.className = 'chip' + (linked ? ' on' : hasBot ? ' warn' : '');
+  $('chipPartnerTxt').textContent = linked ? `↔ ${S.partner.name || S.partner.chatName || 'partner'}` : hasBot ? 'BOT OK · NO PARTNER' : 'NO PARTNER';
+  renderLog();
+}
+function renderLog(){
+  $('sentLog').innerHTML = S.log.length ? S.log.map(l => `<div>${l.ok ? '✅' : '❌'} <b>${new Date(l.t).toLocaleString()}</b> · ${l.kind} ${l.ok ? '' : '· ' + esc(l.err)}<br>${esc(l.text.split('\n')[0])}</div>`).join('') : '<div>nothing sent yet</div>';
+}
+$('botSaveBtn').addEventListener('click', async () => {
+  const tok = $('botToken').value.trim(); setMsg('botMsg', 'Checking…');
+  if (tok) { if (!/^\d{6,}:[\w-]{30,}$/.test(tok)) return setMsg('botMsg', 'That does not look like a bot token (123456789:AA…).', 'err'); S.bot.token = tok; }
+  if (!S.bot.token) return setMsg('botMsg', 'Paste the token from @BotFather.', 'err');
+  try { const b = await tg('getMe'); S.bot.username = b.username || ''; await save(); $('botToken').value = ''; setMsg('botMsg', `Bot OK: @${b.username}`, 'ok'); renderPartner(); renderToday(); }
+  catch (e) { setMsg('botMsg', 'Telegram says: ' + e.message, 'err'); if (tok) { S.bot.token = ''; S.bot.username = ''; } }
+});
+$('findBtn').addEventListener('click', async () => {
+  setMsg('partnerMsg', 'Asking your bot who has messaged it…'); $('chatList').innerHTML = '';
+  try {
+    const ups = await tg('getUpdates', { limit:100, timeout:0, allowed_updates:'["message"]' });
+    const chats = new Map();
+    for (const u of ups) { const c = u.message && u.message.chat; if (c && c.type === 'private') chats.set(String(c.id), `${c.first_name || ''} ${c.last_name || ''}`.trim() + (c.username ? ` @${c.username}` : '')); }
+    if (!chats.size) return setMsg('partnerMsg', 'Nobody yet. Your partner must open the bot in Telegram and press Start, then try again (within 24 hours).', 'err');
+    $('chatList').innerHTML = [...chats].map(([id, name]) => `<button type="button" data-cid="${id}" data-cn="${esc(name)}"><span>${esc(name || 'unnamed')}</span><span class="cid">${id}</span></button>`).join('');
+    setMsg('partnerMsg', `${chats.size} chat${chats.size === 1 ? '' : 's'} found. Pick your partner.`, 'ok');
+  } catch (e) { setMsg('partnerMsg', 'Telegram says: ' + e.message, 'err'); }
+});
+$('chatList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cid]'); if (!b) return;
+  S.partner.chatId = b.dataset.cid; S.partner.chatName = b.dataset.cn; if (!S.partner.name) S.partner.name = (b.dataset.cn.split(' ')[0] || '').replace('@', '');
+  await save(); $('chatList').innerHTML = ''; renderPartner(); renderToday(); setMsg('partnerMsg', `Linked to ${S.partner.chatName}. Send a test!`, 'ok');
+});
+$('testBtn').addEventListener('click', async () => {
+  setMsg('partnerMsg', 'Sending…');
+  try { await sendToPartner('test', `✅ Test from ${me()}'s Nudge. If you can read this, the nudges will reach you.`); setMsg('partnerMsg', 'Delivered. Ask your partner to confirm.', 'ok'); }
+  catch (e) { setMsg('partnerMsg', 'Telegram says: ' + e.message, 'err'); }
+});
+$('namesSaveBtn').addEventListener('click', async () => { S.partner.name = $('partnerName').value.trim(); S.me.name = $('myName').value.trim(); await save(); renderPartner(); renderToday(); setMsg('partnerMsg', 'Saved.', 'ok'); });
+['autoDaily','autoWeekly','allowSos'].forEach(id => $(id).addEventListener('change', async () => { S.settings[id] = $(id).checked; await save(); renderToday(); }));
+
+/* ---------- settings ---------- */
+function renderSettings(){ [...$('weekStart').children].forEach(b => b.classList.toggle('on', +b.dataset.ws === S.settings.weekStart)); }
+$('weekStart').addEventListener('click', async e => { const b = e.target.closest('[data-ws]'); if (b) { S.settings.weekStart = +b.dataset.ws; await save(); renderSettings(); if (detailId) renderDetail(); } });
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  currentTab = t;
+  document.querySelectorAll('section[data-tab]').forEach(s => s.hidden = s.dataset.tab !== t);
+  document.querySelectorAll('.dk').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  window.scrollTo(0, 0);
+}
+$('dock').addEventListener('click', e => { const b = e.target.closest('.dk'); if (b) showTab(b.dataset.tab); });
+
+/* ---------- boot ---------- */
+tryRemembered().then(opened => { if (!opened) pk1.focus(); });
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+window.__nudge = { get S(){ return S; }, save, renderAll, showTab, dailyText, weeklyText, streak, bestStreak };
+</script>
+</body>
+</html>
